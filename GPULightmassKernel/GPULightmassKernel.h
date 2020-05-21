@@ -182,4 +182,24 @@ GPULIGHTMASSKERNEL_API void CalculateVolumeSampleList(
 	VolumetricLightSample InOutVolumetricBrickLowerSamples[]
 );
 
+GPULIGHTMASSKERNEL_API void ImportDirectLights(
+	const int NumDirectionalLights,
+	const DirectionalLight DirectionalLights[],
+	const int NumPointLights,
+	const PointLight PointLights[],
+	const int NumSpotLights,
+	const SpotLight SpotLights[]
+);
+
+GPULIGHTMASSKERNEL_API void CalculateDirectLightingAndShadow(
+	const size_t NumTexelsInCurrentBatch,
+	const int CachedSizeX,
+	const int CachedSizeY,
+	const int NumSamples,
+	const float4 WorldPositionMap[],
+	const float4 WorldNormalMap[],
+	const float TexelRadiusMap[],
+	GatheredLightSample OutLightmapData[]
+);
+
 }

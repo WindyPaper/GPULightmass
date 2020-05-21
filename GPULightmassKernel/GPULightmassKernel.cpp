@@ -361,4 +361,28 @@ GPULIGHTMASSKERNEL_API void CalculateVolumeSampleList(
 	cudaFree(cudaVolumetricBrickLowerSamples);
 }
 
+GPULIGHTMASSKERNEL_API void ImportDirectLights(const int NumDirectionalLights, const DirectionalLight DirectionalLights[], const int NumPointLights, const PointLight PointLights[], const int NumSpotLights, const SpotLight SpotLights[])
+{
+	DirectionalLight *cudaDirectionalLights;
+	PointLight *cudaPointLights;
+	SpotLight *cudaSpotLights;
+
+	cudaCheck(cudaMalloc(&cudaDirectionalLights, NumDirectionalLights * sizeof(DirectionalLight)));
+	cudaCheck(cudaMalloc(&cudaPointLights, NumPointLights * sizeof(PointLight)));
+	cudaCheck(cudaMalloc(&cudaSpotLights, NumSpotLights * sizeof(SpotLight)));
+
+	cudaCheck(cudaMemcpy(cudaDirectionalLights, DirectionalLights, sizeof(DirectionalLight) * NumDirectionalLights, cudaMemcpyHostToDevice));
+	cudaCheck(cudaMemcpy(cudaPointLights, PointLights, sizeof(PointLight) * NumPointLights, cudaMemcpyHostToDevice));
+	cudaCheck(cudaMemcpy(cudaSpotLights, SpotLights, sizeof(SpotLight) * NumSpotLights, cudaMemcpyHostToDevice));
+
+	rtBindPunctualLights(NumDirectionalLights, cudaDirectionalLights, NumPointLights, cudaPointLights, NumSpotLights, cudaSpotLights);
+
+	LOG("Add Direct lights. %d directional lights, %d point lights, %d spot lights", NumDirectionalLights, NumPointLights, NumSpotLights);
+}
+
+GPULIGHTMASSKERNEL_API void CalculateDirectLightingAndShadow(const size_t NumTexelsInCurrentBatch, const int CachedSizeX, const int CachedSizeY, const int NumSamples, const float4 WorldPositionMap[], const float4 WorldNormalMap[], const float TexelRadiusMap[], GatheredLightSample OutLightmapData[])
+{
+	
+}
+
 }

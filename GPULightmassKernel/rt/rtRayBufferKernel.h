@@ -452,7 +452,7 @@ __global__ void BucketShadingKernel(
 
 	targetTexel = InHashes[targetTexel].OriginalPosition;
 
-	float3 worldPosition = make_float3(tex1Dfetch(SampleWorldPositionsTexture, targetTexel));
+	//float3 worldPosition = make_float3(tex1Dfetch(SampleWorldPositionsTexture, targetTexel));
 	bool isTwoSided = tex1Dfetch(SampleWorldPositionsTexture, targetTexel).w == 1.0f;
 	float3 worldNormal = make_float3(tex1Dfetch(SampleWorldNormalsTexture, targetTexel));
 	float texelRadius = tex1Dfetch(TexelRadiusTexture, targetTexel);
