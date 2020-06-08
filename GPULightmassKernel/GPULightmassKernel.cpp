@@ -45,6 +45,15 @@ __host__ void rtBindPunctualLights(
 	const GPULightmass::SpotLight* InSpotLights
 );
 
+__host__ void rtBindSampleData(
+	const float4* SampleWorldPositions,
+	const float4* SampleWorldNormals,
+	const float* TexelRadius,
+	GPULightmass::GatheredLightSample* InOutLightmapData,
+	const int InSizeX,
+	const int InSizeY
+);
+
 __host__ void rtSetGlobalSamplingParameters(
 	float FireflyClampingThreshold
 );
@@ -66,6 +75,7 @@ void LOG(const char* format, ...)
 	va_start(argptr, format);
 	vsprintf(dest, format, argptr);
 	GLogHandler((L"GPULightmass Kernel: " + RStringUtils::Widen(dest)).c_str());
+	OutputDebugStringW((L"GPULightmass Kernel: " + RStringUtils::Widen(dest)).c_str());
 	va_end(argptr);
 }
 
@@ -382,7 +392,39 @@ GPULIGHTMASSKERNEL_API void ImportDirectLights(const int NumDirectionalLights, c
 
 GPULIGHTMASSKERNEL_API void CalculateDirectLightingAndShadow(const size_t NumTexelsInCurrentBatch, const int CachedSizeX, const int CachedSizeY, const int NumSamples, const float4 WorldPositionMap[], const float4 WorldNormalMap[], const float TexelRadiusMap[], GatheredLightSample OutLightmapData[])
 {
-	
+	float4* cudaSampleWorldPositions;
+	float4* cudaSampleWorldNormals;
+	float*	cudaTexelRadius;
+	GPULightmass::GatheredLightSample* cudaOutLightmapData;
+
+	cudaCheck(cudaMalloc((void**)&cudaSampleWorldPositions, CachedSizeX * CachedSizeY * sizeof(float4)));
+	cudaCheck(cudaMemcpyAsync(cudaSampleWorldPositions, WorldPositionMap, CachedSizeX * CachedSizeY * sizeof(float4), cudaMemcpyHostToDevice));
+
+	cudaCheck(cudaMalloc((void**)&cudaSampleWorldNormals, CachedSizeX * CachedSizeY * sizeof(float4)));
+	cudaCheck(cudaMemcpyAsync(cudaSampleWorldNormals, WorldNormalMap, CachedSizeX * CachedSizeY * sizeof(float4), cudaMemcpyHostToDevice));
+
+	cudaCheck(cudaMalloc((void**)&cudaTexelRadius, CachedSizeX * CachedSizeY * sizeof(float)));
+	cudaCheck(cudaMemcpyAsync(cudaTexelRadius, TexelRadiusMap, CachedSizeX * CachedSizeY * sizeof(float), cudaMemcpyHostToDevice));
+
+	cudaCheck(cudaMalloc((void**)&cudaOutLightmapData, CachedSizeX * CachedSizeY * sizeof(GPULightmass::GatheredLightSample)));
+
+	rtBindSampleData(cudaSampleWorldPositions, cudaSampleWorldNormals, cudaTexelRadius, cudaOutLightmapData, CachedSizeX, CachedSizeY);
+
+	cudaCheck(cudaMemset(cudaOutLightmapData, 0, CachedSizeX * CachedSizeY * sizeof(GPULightmass::GatheredLightSample)));
+
+	float MRaysPerSecond = 1.0f;
+	//float time = rtTimedLaunch(MRaysPerSecond, NumSamples);
+
+
+
+	cudaPostKernelLaunchCheck
+
+	cudaCheck(cudaMemcpyAsync(OutLightmapData, cudaOutLightmapData, CachedSizeX * CachedSizeY * sizeof(GPULightmass::GatheredLightSample), cudaMemcpyDeviceToHost));
+
+	cudaCheck(cudaFree(cudaOutLightmapData));
+	cudaCheck(cudaFree(cudaSampleWorldPositions));
+	cudaCheck(cudaFree(cudaSampleWorldNormals));
+	cudaCheck(cudaFree(cudaTexelRadius));
 }
 
 }
