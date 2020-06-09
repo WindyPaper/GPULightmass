@@ -116,3 +116,4 @@ __device__ int FinishedRayCount = 0;
 
 // Host source code
 #include "rtHostConfig.h"
+#include "rtDirectLighting.h"

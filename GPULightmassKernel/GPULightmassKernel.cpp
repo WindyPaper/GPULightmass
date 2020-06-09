@@ -16,6 +16,8 @@
 #include "ProgressReport.h"
 #include "BVH/EmbreeBVHBuilder.h"
 
+//#include "rt/rtDirectLighting.h"
+
 __host__ void rtBindMaskedCollisionMaps(
 	int NumMaps,
 	cudaTextureObject_t* InMaps
@@ -53,6 +55,8 @@ __host__ void rtBindSampleData(
 	const int InSizeX,
 	const int InSizeY
 );
+
+__host__ void rtCalculateDirectLighting();
 
 __host__ void rtSetGlobalSamplingParameters(
 	float FireflyClampingThreshold
@@ -412,10 +416,9 @@ GPULIGHTMASSKERNEL_API void CalculateDirectLightingAndShadow(const size_t NumTex
 
 	cudaCheck(cudaMemset(cudaOutLightmapData, 0, CachedSizeX * CachedSizeY * sizeof(GPULightmass::GatheredLightSample)));
 
-	float MRaysPerSecond = 1.0f;
+	//float MRaysPerSecond = 1.0f;
 	//float time = rtTimedLaunch(MRaysPerSecond, NumSamples);
-
-
+	rtCalculateDirectLighting();
 
 	cudaPostKernelLaunchCheck
 

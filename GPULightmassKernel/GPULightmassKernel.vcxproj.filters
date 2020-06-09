@@ -55,6 +55,9 @@
       <Filter>BVH</Filter>
     </ClInclude>
     <ClInclude Include="sh_warpreduction.h" />
+    <ClInclude Include="rt\rtDirectLighting.h">
+      <Filter>rt</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="BVH">
