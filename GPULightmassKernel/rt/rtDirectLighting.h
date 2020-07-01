@@ -31,7 +31,7 @@ __global__ void CalculateDirectLighting()
 
 		if (OutHitInfo.TriangleIndex == -1)
 		{
-			OutLightmapData[TargetTexelLocation].IncidentLighting = DirectionalLights[index].Color * make_float3(max(dot(RayInWorldSpace, Normal), 0.0f));
+			OutLightmapData[TargetTexelLocation].IncidentLighting += DirectionalLights[index].Color * make_float3(max(dot(RayInWorldSpace, Normal), 0.0f));
 			//OutLightmapData[TargetTexelLocation].IncidentLighting = (Normal);// make_float3(OutHitInfo.TriangleIndex / 5, OutHitInfo.TriangleIndex / 5, OutHitInfo.TriangleIndex / 5);
 		}
 	}
@@ -56,7 +56,7 @@ __global__ void CalculateDirectLighting()
 
 			if (OutHitInfo.TriangleIndex == -1)
 			{
-				OutLightmapData[TargetTexelLocation].IncidentLighting = PointLights[index].Color * make_float3(max(dot(normalize(LightPosition - WorldPosition), WorldNormal), 0.0f)) / (Distance * Distance + 1.0f);
+				OutLightmapData[TargetTexelLocation].IncidentLighting += PointLights[index].Color * make_float3(max(dot(normalize(LightPosition - WorldPosition), WorldNormal), 0.0f)) / (Distance * Distance + 1.0f);
 			}
 		}
 	}
@@ -85,7 +85,7 @@ __global__ void CalculateDirectLighting()
 						(dot(normalize(WorldPosition - LightPosition), SpotLights[index].Direction) - SpotLights[index].CosOuterConeAngle) / (SpotLights[index].CosInnerConeAngle - SpotLights[index].CosOuterConeAngle)
 						, 0.0f, 1.0f);
 					SpotAttenuation *= SpotAttenuation;
-					OutLightmapData[TargetTexelLocation].IncidentLighting = SpotLights[index].Color * make_float3(max(dot(normalize(LightPosition - WorldPosition), WorldNormal), 0.0f)) / (Distance * Distance + 1.0f) * SpotAttenuation;
+					OutLightmapData[TargetTexelLocation].IncidentLighting += SpotLights[index].Color * make_float3(max(dot(normalize(LightPosition - WorldPosition), WorldNormal), 0.0f)) / (Distance * Distance + 1.0f) * SpotAttenuation;
 				}
 			}
 	}
