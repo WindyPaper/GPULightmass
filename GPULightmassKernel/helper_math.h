@@ -1683,3 +1683,16 @@ __device__ inline float3 LiftPoint2DToHemisphere(const float2& p)
 {
 	return make_float3(p.x, p.y, sqrtf(1 - p.x * p.x - p.y * p.y));
 }
+
+__device__ inline float3 WorldToTangent(const float3& v, const float3 &tangent, const float3 &binormal, const float3 &normal)
+{
+	float3 ret = make_float3(dot(v, make_float3(tangent.x, binormal.x, normal.x)),
+		dot(v, make_float3(tangent.y, binormal.y, normal.y)),
+		dot(v, make_float3(tangent.z, binormal.z, normal.z)));
+
+	//float3 ret = make_float3(dot(v, tangent),
+	//	dot(v, binormal),
+	//	dot(v, normal));
+
+	return ret;
+}
