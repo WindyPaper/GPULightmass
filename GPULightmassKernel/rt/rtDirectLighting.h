@@ -9,7 +9,13 @@ __global__ void CalculateDirectLighting()
 		return;
 
 	float3 WorldPosition = make_float3(tex1Dfetch(SampleWorldPositionsTexture, TargetTexelLocation));
-	float3 WorldNormal = make_float3(tex1Dfetch(SampleWorldNormalsTexture, TargetTexelLocation));
+	float3 WorldNormal = make_float3(tex1Dfetch(SampleWorldNormalsTexture, TargetTexelLocation));	
+
+	float3 tangent1, tangent2;
+	tangent1 = cross(WorldNormal, make_float3(0, 0, 1));
+	tangent1 = length(tangent1) < 0.1 ? cross(WorldNormal, make_float3(0, 1, 0)) : tangent1;
+	tangent1 = normalize(tangent1);
+	tangent2 = normalize(cross(tangent1, WorldNormal));
 
 	for (int index = 0; index < NumDirectionalLights; ++index)
 	{
@@ -31,8 +37,11 @@ __global__ void CalculateDirectLighting()
 
 		if (OutHitInfo.TriangleIndex == -1)
 		{
-			OutLightmapData[TargetTexelLocation].IncidentLighting += DirectionalLights[index].Color * make_float3(max(dot(RayInWorldSpace, Normal), 0.0f));
-			//OutLightmapData[TargetTexelLocation].IncidentLighting = (Normal);// make_float3(OutHitInfo.TriangleIndex / 5, OutHitInfo.TriangleIndex / 5, OutHitInfo.TriangleIndex / 5);
+			//OutLightmapData[TargetTexelLocation].IncidentLighting += DirectionalLights[index].Color * make_float3(max(dot(RayInWorldSpace, Normal), 0.0f));			
+			float3 radiance = DirectionalLights[index].Color * make_float3(max(dot(RayInWorldSpace, Normal), 0.0f));
+
+			float3 RayInTangentSpace = WorldToTangent(RayInWorldSpace, tangent1, tangent2, WorldNormal);
+			OutLightmapData[TargetTexelLocation].PointLightWorldSpace(radiance, RayInTangentSpace, RayInWorldSpace);
 		}
 	}
 
@@ -55,8 +64,10 @@ __global__ void CalculateDirectLighting()
 				make_float4(RayInWorldSpace, Distance - 0.00001f), true);
 
 			if (OutHitInfo.TriangleIndex == -1)
-			{
-				OutLightmapData[TargetTexelLocation].IncidentLighting += PointLights[index].Color * make_float3(max(dot(normalize(LightPosition - WorldPosition), WorldNormal), 0.0f)) / (Distance * Distance + 1.0f);
+			{				
+				float3 radiance = PointLights[index].Color * make_float3(max(dot(RayInWorldSpace, WorldNormal), 0.0f)) / (Distance * Distance + 1.0f);
+				float3 RayInTangentSpace = WorldToTangent(RayInWorldSpace, tangent1, tangent2, WorldNormal);
+				OutLightmapData[TargetTexelLocation].PointLightWorldSpace(radiance, RayInTangentSpace, RayInWorldSpace);
 			}
 		}
 	}
