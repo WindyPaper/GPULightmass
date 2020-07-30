@@ -37,8 +37,7 @@ __global__ void CalculateDirectLighting()
 
 		if (OutHitInfo.TriangleIndex == -1)
 		{
-			//OutLightmapData[TargetTexelLocation].IncidentLighting += DirectionalLights[index].Color * make_float3(max(dot(RayInWorldSpace, Normal), 0.0f));			
-			float3 radiance = DirectionalLights[index].Color * make_float3(max(dot(RayInWorldSpace, Normal), 0.0f));
+			float3 radiance = DirectionalLights[index].Color;// *make_float3(max(dot(RayInWorldSpace, Normal), 0.0f));
 
 			float3 RayInTangentSpace = WorldToTangent(RayInWorldSpace, tangent1, tangent2, WorldNormal);
 			OutLightmapData[TargetTexelLocation].PointLightWorldSpace(radiance, RayInTangentSpace, RayInWorldSpace);
@@ -65,7 +64,7 @@ __global__ void CalculateDirectLighting()
 
 			if (OutHitInfo.TriangleIndex == -1)
 			{				
-				float3 radiance = PointLights[index].Color * make_float3(max(dot(RayInWorldSpace, WorldNormal), 0.0f)) / (Distance * Distance + 1.0f);
+				float3 radiance = PointLights[index].Color / (Distance * Distance + 1.0f);
 				float3 RayInTangentSpace = WorldToTangent(RayInWorldSpace, tangent1, tangent2, WorldNormal);
 				OutLightmapData[TargetTexelLocation].PointLightWorldSpace(radiance, RayInTangentSpace, RayInWorldSpace);
 			}
@@ -96,7 +95,12 @@ __global__ void CalculateDirectLighting()
 						(dot(normalize(WorldPosition - LightPosition), SpotLights[index].Direction) - SpotLights[index].CosOuterConeAngle) / (SpotLights[index].CosInnerConeAngle - SpotLights[index].CosOuterConeAngle)
 						, 0.0f, 1.0f);
 					SpotAttenuation *= SpotAttenuation;
-					OutLightmapData[TargetTexelLocation].IncidentLighting += SpotLights[index].Color * make_float3(max(dot(normalize(LightPosition - WorldPosition), WorldNormal), 0.0f)) / (Distance * Distance + 1.0f) * SpotAttenuation;
+
+					float3 RayInTangentSpace = WorldToTangent(RayInWorldSpace, tangent1, tangent2, WorldNormal);
+					float3 radiance = SpotLights[index].Color / (Distance * Distance + 1.0f) * SpotAttenuation;
+					OutLightmapData[TargetTexelLocation].IncidentLighting += SpotLights[index].Color / (Distance * Distance + 1.0f) * SpotAttenuation;
+
+					OutLightmapData[TargetTexelLocation].PointLightWorldSpace(radiance, RayInTangentSpace, RayInWorldSpace);
 				}
 			}
 	}
