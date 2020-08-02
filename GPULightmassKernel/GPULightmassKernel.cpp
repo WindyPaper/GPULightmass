@@ -430,4 +430,19 @@ GPULIGHTMASSKERNEL_API void CalculateDirectLightingAndShadow(const size_t NumTex
 	cudaCheck(cudaFree(cudaTexelRadius));
 }
 
+GPULIGHTMASSKERNEL_API void CalculateAllLightingAndShadow(
+	const size_t NumTexelsInCurrentBatch,
+	const int CachedSizeX,
+	const int CachedSizeY,
+	const int NumSamples,
+	const float4 WorldPositionMap[],
+	const float4 WorldNormalMap[],
+	const float TexelRadiusMap[],
+	GatheredLightSample OutLightmapData[]
+)
+{
+	CalculateAllBakedLighting(WorldPositionMap, WorldNormalMap, TexelRadiusMap, OutLightmapData, CachedSizeX, CachedSizeY, NumSamples);
+	ReportCurrentFinishedTexels(NumTexelsInCurrentBatch);
+}
+
 }

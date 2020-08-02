@@ -35,5 +35,12 @@ void CalculateLighting(
 	GPULightmass::GatheredLightSample OutLightmapData[],
 	int SizeX, int SizeY, 
 	int NumSamples);
+void CalculateAllBakedLighting(
+	const float4* SamplingWorldPositions,
+	const float4* SamplingWorldNormals,
+	const float* TexelRadius,
+	GPULightmass::GatheredLightSample OutLightmapData[],
+	int SizeX, int SizeY,
+	int NumSamples);
 void GenerateSDF(Vec3f BoundingBoxMin, Vec3f BoundingBoxMax, Vec3i VolumeDimension, float* OutBuffer);
 

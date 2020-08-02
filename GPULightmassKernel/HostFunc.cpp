@@ -56,6 +56,8 @@ __host__ void rtBindSkyCubemapData(
 
 float rtTimedLaunch(float& OutMRaysPerSecond, int NumSamples);
 
+__host__ void rtCalculateDirectLighting();
+
 float rtTimedLaunchRadiosity(int NumBounces, int NumSamplesFirstPass);
 
 void cudaGenerateSignedDistanceFieldVolumeData(Vec3f BoundingBoxMin, Vec3f BoundingBoxMax, Vec3i VolumeDimension, float* OutBuffer, int ZSliceIndex);
@@ -255,6 +257,52 @@ void CalculateLighting(
 
 	float MRaysPerSecond = 1.0f;
 	float time = rtTimedLaunch(MRaysPerSecond, NumSamples);
+
+	cudaCheck(cudaMemcpyAsync(OutLightmapData, cudaOutLightmapData, SizeX * SizeY * sizeof(GPULightmass::GatheredLightSample), cudaMemcpyDeviceToHost));
+
+	cudaCheck(cudaFree(cudaOutLightmapData));
+	cudaCheck(cudaFree(cudaSampleWorldPositions));
+	cudaCheck(cudaFree(cudaSampleWorldNormals));
+	cudaCheck(cudaFree(cudaTexelRadius));
+}
+
+void CalculateAllBakedLighting(
+	const float4* SampleWorldPositions,
+	const float4* SampleWorldNormals,
+	const float* TexelRadius,
+	GPULightmass::GatheredLightSample OutLightmapData[],
+	int SizeX, int SizeY,
+	int NumSamples)
+{
+	if (SizeX == 1022)
+		SaveSampleDataToFile(SampleWorldPositions, SampleWorldNormals, TexelRadius, SizeX, SizeY, "samplecache.dat");
+
+	float4* cudaSampleWorldPositions;
+	float4* cudaSampleWorldNormals;
+	float* cudaTexelRadius;
+	GPULightmass::GatheredLightSample* cudaOutLightmapData;
+
+	cudaCheck(cudaMalloc((void**)&cudaSampleWorldPositions, SizeX * SizeY * sizeof(float4)));
+	cudaCheck(cudaMemcpyAsync(cudaSampleWorldPositions, SampleWorldPositions, SizeX * SizeY * sizeof(float4), cudaMemcpyHostToDevice));
+
+	cudaCheck(cudaMalloc((void**)&cudaSampleWorldNormals, SizeX * SizeY * sizeof(float4)));
+	cudaCheck(cudaMemcpyAsync(cudaSampleWorldNormals, SampleWorldNormals, SizeX * SizeY * sizeof(float4), cudaMemcpyHostToDevice));
+
+	cudaCheck(cudaMalloc((void**)&cudaTexelRadius, SizeX * SizeY * sizeof(float)));
+	cudaCheck(cudaMemcpyAsync(cudaTexelRadius, TexelRadius, SizeX * SizeY * sizeof(float), cudaMemcpyHostToDevice));
+
+	cudaCheck(cudaMalloc((void**)&cudaOutLightmapData, SizeX * SizeY * sizeof(GPULightmass::GatheredLightSample)));
+
+	rtBindSampleData(cudaSampleWorldPositions, cudaSampleWorldNormals, cudaTexelRadius, cudaOutLightmapData, SizeX, SizeY);
+
+	cudaCheck(cudaMemset(cudaOutLightmapData, 0, SizeX * SizeY * sizeof(GPULightmass::GatheredLightSample)));
+
+	//indirected lighting
+	float MRaysPerSecond = 1.0f;
+	float time = rtTimedLaunch(MRaysPerSecond, NumSamples);
+
+	//direct lighting
+	rtCalculateDirectLighting();
 
 	cudaCheck(cudaMemcpyAsync(OutLightmapData, cudaOutLightmapData, SizeX * SizeY * sizeof(GPULightmass::GatheredLightSample), cudaMemcpyDeviceToHost));
 

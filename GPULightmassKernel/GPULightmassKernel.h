@@ -74,10 +74,18 @@ struct VolumetricLightSample
 	float BackfacingHitsFraction;
 };
 
+enum BakedType
+{
+	//REAL_TIME = 0, //不需要用，占位
+	MIXED = 1,
+	ALL_BAKED = 2
+};
+
 struct DirectionalLight
 {
 	float3 Color;
 	float3 Direction;
+	BakedType type;
 };
 
 struct PointLight
@@ -85,6 +93,7 @@ struct PointLight
 	float3 Color;
 	float Radius;
 	float3 WorldPosition;
+	BakedType type;
 };
 
 struct SpotLight
@@ -95,6 +104,7 @@ struct SpotLight
 	float CosOuterConeAngle;
 	float3 Direction;
 	float CosInnerConeAngle;
+	BakedType type;
 };
 
 typedef void(*GPULightmassLogHandler)(const wchar_t* message);
@@ -192,6 +202,18 @@ GPULIGHTMASSKERNEL_API void ImportDirectLights(
 );
 
 GPULIGHTMASSKERNEL_API void CalculateDirectLightingAndShadow(
+	const size_t NumTexelsInCurrentBatch,
+	const int CachedSizeX,
+	const int CachedSizeY,
+	const int NumSamples,
+	const float4 WorldPositionMap[],
+	const float4 WorldNormalMap[],
+	const float TexelRadiusMap[],
+	GatheredLightSample OutLightmapData[]
+);
+
+//direct + indirected
+GPULIGHTMASSKERNEL_API void CalculateAllLightingAndShadow(
 	const size_t NumTexelsInCurrentBatch,
 	const int CachedSizeX,
 	const int CachedSizeY,

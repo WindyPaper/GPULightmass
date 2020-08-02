@@ -158,10 +158,14 @@ struct GatheredLightSample
 	}
 };
 
+const int MIXED = 1;
+const int ALL_BAKED = 2;
+
 struct DirectionalLight
 {
 	float3 Color;
 	float3 Direction;
+	int BakeType;
 };
 
 struct PointLight
@@ -169,6 +173,7 @@ struct PointLight
 	float3 Color;
 	float Radius;
 	float3 WorldPosition;
+	int BakeType;
 };
 
 struct SpotLight
@@ -179,6 +184,7 @@ struct SpotLight
 	float CosOuterConeAngle;
 	float3 Direction;
 	float CosInnerConeAngle;
+	int BakeType;
 };
 
 }
