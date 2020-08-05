@@ -177,7 +177,7 @@ __global__ void VolumeSampleListIndirectLightingKernel(
 	}
 
 	GatheredRadiance[threadIdx.x][threadIdx.y] = GatheredRadiance[threadIdx.x][threadIdx.y] * (2.0f * 3.1415926f / (NumVolumetricSamplesTheta * NumVolumetricSamplesPhi));
-	GatheredRadiance[threadIdx.x][threadIdx.y].SkyOcclusion /= 2.0f * 3.1415926f;
+	GatheredRadiance[threadIdx.x][threadIdx.y].SkyOcclusion /= 2.0f * 3.1415926f;	
 
 	for (int stride = VolumetricBlockSize >> 1; stride > 0; stride >>= 1)
 	{
@@ -209,6 +209,104 @@ __global__ void VolumeSampleListIndirectLightingKernel(
 	if (threadIdx.x == 0 && threadIdx.y == 0)
 	{
 		GatheredRadiance[0][0].BackfacingHitsFraction = NumBackfaceHits[0][0] / NumTotalHits[0][0];
+
+		//direct light
+		for (int index = 0; index < NumDirectionalLights; ++index)
+		{
+			if (DirectionalLights[index].BakeType == GPULightmass::ALL_BAKED)
+			{
+				float3 RayInWorldSpace = normalize(-DirectionalLights[index].Direction);
+
+				float3 Normal = WorldNormal;
+
+				/*if (ReflectanceMap[TargetTexelLocation].w == 1.0f && dot(RayInWorldSpace, Normal) < 0.0f)
+					Normal = -Normal;*/
+
+				float3 RayOrigin = WorldPosition + Normal * 0.5f;
+
+				HitInfo OutHitInfo;
+
+				rtTrace(
+					OutHitInfo,
+					make_float4(RayOrigin, 0.01),
+					make_float4(RayInWorldSpace, 1e20), true);
+
+				if (OutHitInfo.TriangleIndex == -1)
+				{
+					float3 radiance = DirectionalLights[index].Color;// *make_float3(max(dot(RayInWorldSpace, Normal), 0.0f));
+
+					float3 RayInTangentSpace = WorldToTangent(RayInWorldSpace, Tangent1, Tangent2, WorldNormal);
+					GatheredRadiance[0][0].PointLightWorldSpace(radiance, RayInTangentSpace, RayInWorldSpace);
+				}
+			}
+		}
+
+		//point light
+		for (int index = 0; index < NumPointLights; ++index)
+		{
+			if (PointLights[index].BakeType == GPULightmass::ALL_BAKED)
+			{
+				float3 LightPosition = PointLights[index].WorldPosition;
+				float Distance = length(WorldPosition - LightPosition);
+				if (Distance < PointLights[index].Radius)
+				{
+					float3 RayOrigin = WorldPosition + WorldNormal * 0.5f;
+					float3 RayInWorldSpace = normalize(LightPosition - WorldPosition);
+
+					HitInfo OutHitInfo;
+
+					rtTrace(
+						OutHitInfo,
+						make_float4(RayOrigin, 0.01),
+						make_float4(RayInWorldSpace, Distance - 0.00001f), true);
+
+					if (OutHitInfo.TriangleIndex == -1)
+					{
+						float3 radiance = PointLights[index].Color / (Distance * Distance + 1.0f);
+						float3 RayInTangentSpace = WorldToTangent(RayInWorldSpace, Tangent1, Tangent2, WorldNormal);
+						GatheredRadiance[0][0].PointLightWorldSpace(radiance, RayInTangentSpace, RayInWorldSpace);
+					}
+				}
+			}
+		}
+
+		// SpotLights
+		for (int index = 0; index < NumSpotLights; ++index)
+		{
+			if (PointLights[index].BakeType == GPULightmass::ALL_BAKED)
+			{
+				float3 LightPosition = SpotLights[index].WorldPosition;
+				float Distance = length(WorldPosition - LightPosition);
+				if (Distance < SpotLights[index].Radius)
+				{
+					if (dot(normalize(WorldPosition - LightPosition), SpotLights[index].Direction) > SpotLights[index].CosOuterConeAngle)
+					{
+						float3 RayOrigin = WorldPosition + WorldNormal * 0.5f;
+						float3 RayInWorldSpace = normalize(LightPosition - WorldPosition);
+
+						HitInfo OutHitInfo;
+
+						rtTrace(
+							OutHitInfo,
+							make_float4(RayOrigin, 0.01),
+							make_float4(RayInWorldSpace, Distance - 0.00001f), true);
+
+						if (OutHitInfo.TriangleIndex == -1)
+						{
+							float SpotAttenuation = clampf(
+								(dot(normalize(WorldPosition - LightPosition), SpotLights[index].Direction) - SpotLights[index].CosOuterConeAngle) / (SpotLights[index].CosInnerConeAngle - SpotLights[index].CosOuterConeAngle)
+								, 0.0f, 1.0f);
+							SpotAttenuation *= SpotAttenuation;
+
+							float3 RayInTangentSpace = WorldToTangent(RayInWorldSpace, Tangent1, Tangent2, WorldNormal);
+							float3 radiance = SpotLights[index].Color / (Distance * Distance + 1.0f) * SpotAttenuation;
+							GatheredRadiance[0][0].PointLightWorldSpace(radiance, RayInTangentSpace, RayInWorldSpace);
+						}
+					}
+				}
+			}
+		}
+
 		OutVolumeSamples[TargetTexelLocation] = GatheredRadiance[0][0];
 	}
 }
