@@ -1622,6 +1622,9 @@ struct SHVectorRGB3
 	}
 
 	__device__ __host__ void addIncomingRadiance(const float3& incomingRadiance, float weight, const float3& worldSpaceDirection);
+
+	__device__ __host__ void _dering(SHVector3 &sh3);
+	__device__ __host__ void dering();
 };
 
 __device__ __host__ inline SHVectorRGB operator*(SHVector2 A, float3 color)
@@ -1652,6 +1655,43 @@ __device__ __host__ inline void SHVectorRGB::addIncomingRadiance(const float3& i
 __device__ __host__ inline void SHVectorRGB3::addIncomingRadiance(const float3& incomingRadiance, float weight, const float3& worldSpaceDirection)
 {
 	*this += SHVector3::basisFunction(worldSpaceDirection) * (incomingRadiance * weight);
+}
+
+__device__ __host__ inline void SHVectorRGB3::_dering(SHVector3 &sh3)
+{
+	//http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.421.901&rep=rep1&type=pdf
+	//Lambertian Reflectance and Linear Subspaces
+	const float pi = 3.1415926f;
+	const int l = 3;
+	float kn[l]; //l = 3
+	float alpha_l[l];
+
+	kn[0] = sqrtf(pi) / 2.0f;
+	kn[1] = sqrtf(pi / 3.0f);
+	kn[2] = sqrtf(pi * 5.0f) / 8.0f;
+
+	alpha_l[0] = sqrtf(pi * 4.0f);
+	alpha_l[1] = sqrtf((pi * 4.0f) / 3.0f);
+	alpha_l[2] = sqrtf((pi * 4.0f) / 5.0f);
+
+	sh3.v[0] = sh3.v[0] * kn[0] * alpha_l[0];
+
+	sh3.v[1] = sh3.v[1] * kn[1] * alpha_l[1];
+	sh3.v[2] = sh3.v[2] * kn[1] * alpha_l[1];
+	sh3.v[3] = sh3.v[3] * kn[1] * alpha_l[1];
+
+	sh3.v[4] = sh3.v[4] * kn[2] * alpha_l[2];
+	sh3.v[5] = sh3.v[5] * kn[2] * alpha_l[2];
+	sh3.v[6] = sh3.v[6] * kn[2] * alpha_l[2];
+	sh3.v[7] = sh3.v[7] * kn[2] * alpha_l[2];
+	sh3.v[8] = sh3.v[8] * kn[2] * alpha_l[2];
+}
+
+__device__ __host__ inline void SHVectorRGB3::dering()
+{
+	_dering(r);
+	_dering(g);
+	_dering(b);
 }
 
 __device__ __host__ __inline__ float getLuminance(const float3& v)
@@ -1686,13 +1726,9 @@ __device__ inline float3 LiftPoint2DToHemisphere(const float2& p)
 
 __device__ inline float3 WorldToTangent(const float3& v, const float3 &tangent, const float3 &binormal, const float3 &normal)
 {
-	float3 ret = make_float3(dot(v, make_float3(tangent.x, binormal.x, normal.x)),
-		dot(v, make_float3(tangent.y, binormal.y, normal.y)),
-		dot(v, make_float3(tangent.z, binormal.z, normal.z)));
+	float3 ret = make_float3(dot(v, tangent),
+		dot(v, binormal),
+		dot(v, normal));
 
-	//float3 ret = make_float3(dot(v, tangent),
-	//	dot(v, binormal),
-	//	dot(v, normal));
-
-	return ret;
+	return normalize(ret);
 }

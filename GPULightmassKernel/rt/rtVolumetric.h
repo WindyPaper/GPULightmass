@@ -306,7 +306,7 @@ __global__ void VolumeSampleListIndirectLightingKernel(
 				}
 			}
 		}
-
+		GatheredRadiance[0][0].SHVector.dering(); //放到最后去环
 		OutVolumeSamples[TargetTexelLocation] = GatheredRadiance[0][0];
 	}
 }
