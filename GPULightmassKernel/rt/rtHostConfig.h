@@ -480,3 +480,21 @@ __host__ void cudaGenerateSignedDistanceFieldVolumeData(Vec3f BoundingBoxMin, Ve
 
 	cudaDeviceSynchronize();
 }
+
+__host__ void rtBindRasterizeData(
+	const float3 *VertexData,
+	const float2 *UVs,
+	const int *TriangleIndex,
+	const int NumVertices,
+	const int NumTriangles,
+	const int GridElementSize
+)
+{
+	cudaCheck(cudaMemcpyToSymbol(RasVertexLocalPos, &VertexData, sizeof(VertexData)));
+	cudaCheck(cudaMemcpyToSymbol(RasVertexUVs, &UVs, sizeof(UVs)));
+	cudaCheck(cudaMemcpyToSymbol(RasTriangleIndexs, &TriangleIndex, sizeof(TriangleIndex)));
+
+	cudaCheck(cudaMemcpyToSymbol(RasNumVertices, &NumVertices, sizeof(NumVertices)));
+	cudaCheck(cudaMemcpyToSymbol(RasNumTriangles, &NumTriangles, sizeof(NumTriangles)));
+	cudaCheck(cudaMemcpyToSymbol(RasGridElementSize, &GridElementSize, sizeof(GridElementSize)));
+}

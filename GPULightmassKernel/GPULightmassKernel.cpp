@@ -56,11 +56,22 @@ __host__ void rtBindSampleData(
 	const int InSizeY
 );
 
+__host__ void rtBindRasterizeData(
+	const float3 *VertexData,
+	const float2 *UVs,
+	const int *TriangleIndex,
+	const int NumVertices,
+	const int NumTriangles,
+	const int GridElementSize
+);
+
 __host__ void rtCalculateDirectLighting();
 
 __host__ void rtSetGlobalSamplingParameters(
 	float FireflyClampingThreshold
 );
+
+__host__ void rtRasterizeModel(const int NumVertices, const int NumTriangles);
 
 void WriteHDR(std::string fileName, const float4* buffer, int Width, int Height);
 
@@ -443,6 +454,24 @@ GPULIGHTMASSKERNEL_API void CalculateAllLightingAndShadow(
 {
 	CalculateAllBakedLighting(WorldPositionMap, WorldNormalMap, TexelRadiusMap, OutLightmapData, CachedSizeX, CachedSizeY, NumSamples);
 	ReportCurrentFinishedTexels(NumTexelsInCurrentBatch);
+}
+
+GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, const int NumVertices, const int NumTriangles, const float3 VertexLocalPositionBuffer[], const float2 VertexTextureUVBuffer[], const int3 TriangleIndexBuffer[], const int TriangleTextureMappingIndex[], int OutNumberSurfel[], float4 OutWorldPosition[], float4 OutWorldNormal[], float4 OutAlbedoAndTransparent[])
+{
+	float3 *cudaLocalPos;
+	float2 *cudaUVs;
+	int *cudaTriangleIndex;
+	cudaCheck(cudaMalloc((void**)&cudaLocalPos, NumVertices * sizeof(float3)));
+	cudaCheck(cudaMalloc((void**)&cudaUVs, NumVertices * sizeof(float2)));
+	cudaCheck(cudaMalloc((void**)&cudaTriangleIndex, NumTriangles * 3 * sizeof(int)));
+
+	cudaCheck(cudaMemcpyAsync(cudaLocalPos, VertexLocalPositionBuffer, NumVertices * sizeof(float3), cudaMemcpyHostToDevice));
+	cudaCheck(cudaMemcpyAsync(cudaUVs, VertexTextureUVBuffer, NumVertices * sizeof(float2), cudaMemcpyHostToDevice));
+	cudaCheck(cudaMemcpyAsync(cudaTriangleIndex, TriangleIndexBuffer, NumTriangles * 3 * sizeof(int), cudaMemcpyHostToDevice));
+	
+	rtBindRasterizeData(cudaLocalPos, cudaUVs, cudaTriangleIndex, NumVertices, NumTriangles, GridElementSize);
+
+	rtRasterizeModel(NumVertices, NumTriangles);
 }
 
 }

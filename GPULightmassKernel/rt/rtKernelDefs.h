@@ -63,6 +63,13 @@ __constant__ float2* VertexTextureLightmapUVs;
 __constant__ int* TriangleMappingIndex;
 __constant__ int* TriangleIndexBuffer;
 
+__constant__ float3* RasVertexLocalPos;
+__constant__ float2* RasVertexUVs;
+__constant__ int* RasTriangleIndexs;
+__constant__ int RasNumVertices;
+__constant__ int RasNumTriangles;
+__constant__ int RasGridElementSize;
+
 //__constant__ float4** GatheringRadiosityBuffers;
 //__constant__ float4** ShootingRadiosityBuffers;
 //__constant__ cudaTextureObject_t* ShootingRadiosityTextures;

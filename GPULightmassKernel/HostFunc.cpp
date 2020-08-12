@@ -54,6 +54,14 @@ __host__ void rtBindSkyCubemapData(
 	const float4 InLowerHemisphereImportantColor[]
 );
 
+__host__ void rtBindSampleData(
+	const float4* SampleWorldPositions,
+	const float4* SampleWorldNormals,
+	const float* TexelRadius,
+	GPULightmass::GatheredLightSample* InOutLightmapData,
+	const int InSizeX,
+	const int InSizeY);
+
 float rtTimedLaunch(float& OutMRaysPerSecond, int NumSamples);
 
 __host__ void rtCalculateDirectLighting();
