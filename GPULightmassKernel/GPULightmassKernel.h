@@ -225,14 +225,15 @@ GPULIGHTMASSKERNEL_API void CalculateAllLightingAndShadow(
 );
 
 //To surface element
-GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(	
-	const int GridElementSize,	
+GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(
+	const int GridElementSize,
 	const int NumVertices,
 	const int NumTriangles,
 	const float3 VertexLocalPositionBuffer[],
 	const float2 VertexTextureUVBuffer[],
-	const int3 TriangleIndexBuffer[],	
+	const int3 TriangleIndexBuffer[],
 	const int TriangleTextureMappingIndex[],
+	const float3 BBox[],
 	int OutNumberSurfel[],
 	float4 OutWorldPosition[],
 	float4 OutWorldNormal[],

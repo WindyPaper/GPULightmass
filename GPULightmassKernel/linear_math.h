@@ -247,6 +247,8 @@ public:
 	inline    Mat4f               operator*   (const float& a) const { Mat4f r; for (int i = 0; i < 4 * 4; i++) r.get(i) = get(i) * a; return r; }
 	inline    const float&        operator()  (int r, int c) const { return get(r, c); }
 	inline    float&              operator()  (int r, int c) { return get(r, c); }
+	inline	  Mat4f				  operator*   (const Mat4f& v);
+	inline	  Vec4f				  operator*   (const Vec4f& v);
 
 	inline                    Mat4f(void) { setIdentity(); }
 	inline    explicit        Mat4f(F32 a) { set(a); }
@@ -330,6 +332,31 @@ void Mat4f::setRow(int idx, const Vec4f& v)
 {
 	for (int i = 0; i < 4; i++)
 		get(idx, i) = v._v[i];
+}
+
+Mat4f Mat4f::operator*(const Mat4f& v)
+{
+	Mat4f ret;
+	for (int i = 0; i < 4; ++i)
+	{
+		for (int j = 0; j < 4; ++j)
+		{
+			ret(i, j) = dot(this->getRow(i), v.getCol(j));
+		}
+	}
+
+	return ret;
+}
+
+Vec4f Mat4f::operator*(const Vec4f& v)
+{
+	Vec4f ret;
+	for (int i = 0; i < 4; ++i)
+	{
+		ret._v[i] = dot(this->getRow(i), v);
+	}
+
+	return ret;
 }
 
 inline float detImpl(const Mat3f& v)

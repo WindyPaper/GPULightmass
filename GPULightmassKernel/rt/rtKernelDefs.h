@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <linear_math.h>
 #include <helper_math.h>
+#include <SurfelData.h>
 
 #define USE_CORRELATED_SAMPLING 0
 
@@ -66,9 +67,14 @@ __constant__ int* TriangleIndexBuffer;
 __constant__ float3* RasVertexLocalPos;
 __constant__ float2* RasVertexUVs;
 __constant__ int* RasTriangleIndexs;
+__constant__ float3* RasBBox;
 __constant__ int RasNumVertices;
 __constant__ int RasNumTriangles;
 __constant__ int RasGridElementSize;
+
+__constant__ SurfelData* RasYZPlaneBuffer;
+__constant__ SurfelData* RasXZPlaneBuffer;
+__constant__ SurfelData* RasXYPlaneBuffer;
 
 //__constant__ float4** GatheringRadiosityBuffers;
 //__constant__ float4** ShootingRadiosityBuffers;

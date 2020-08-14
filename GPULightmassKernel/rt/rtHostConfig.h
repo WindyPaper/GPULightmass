@@ -485,6 +485,7 @@ __host__ void rtBindRasterizeData(
 	const float3 *VertexData,
 	const float2 *UVs,
 	const int *TriangleIndex,
+	const float3 *Bbox,
 	const int NumVertices,
 	const int NumTriangles,
 	const int GridElementSize
@@ -493,8 +494,20 @@ __host__ void rtBindRasterizeData(
 	cudaCheck(cudaMemcpyToSymbol(RasVertexLocalPos, &VertexData, sizeof(VertexData)));
 	cudaCheck(cudaMemcpyToSymbol(RasVertexUVs, &UVs, sizeof(UVs)));
 	cudaCheck(cudaMemcpyToSymbol(RasTriangleIndexs, &TriangleIndex, sizeof(TriangleIndex)));
+	cudaCheck(cudaMemcpyToSymbol(RasBBox, &Bbox, sizeof(Bbox)));
 
 	cudaCheck(cudaMemcpyToSymbol(RasNumVertices, &NumVertices, sizeof(NumVertices)));
 	cudaCheck(cudaMemcpyToSymbol(RasNumTriangles, &NumTriangles, sizeof(NumTriangles)));
 	cudaCheck(cudaMemcpyToSymbol(RasGridElementSize, &GridElementSize, sizeof(GridElementSize)));
+}
+
+__host__ void rtBindRasterizeBufferData(
+	const SurfelData *YZPlane,
+	const SurfelData *XZPlane,
+	const SurfelData *XYPlane
+)
+{
+	cudaCheck(cudaMemcpyToSymbol(RasYZPlaneBuffer, &YZPlane, sizeof(YZPlane)));
+	cudaCheck(cudaMemcpyToSymbol(RasXZPlaneBuffer, &XZPlane, sizeof(XZPlane)));
+	cudaCheck(cudaMemcpyToSymbol(RasXYPlaneBuffer, &XYPlane, sizeof(XYPlane)));
 }
