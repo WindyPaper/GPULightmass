@@ -67,6 +67,12 @@ __host__ void rtBindRasterizeData(
 	const int GridElementSize
 );
 
+__host__ void rtBindRasterizeBufferData(
+	const SurfelData* YZPlane,
+	const SurfelData* XZPlane,
+	const SurfelData* XYPlane
+);
+
 __host__ void rtCalculateDirectLighting();
 
 __host__ void rtSetGlobalSamplingParameters(
@@ -483,6 +489,15 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, co
 	int YZNumBufferSize = ((int)BBox[1].y - (int)BBox[0].y) * ((int)BBox[1].z - (int)BBox[0].z);
 	cudaCheck(cudaMalloc((void**)&cudaYZPlaneBuffer, YZNumBufferSize * sizeof(SurfelData)));
 	cudaCheck(cudaMemset((void**)&cudaYZPlaneBuffer, 0, YZNumBufferSize * sizeof(SurfelData)));
+	SurfelData* cudaXZPlaneBuffer;
+	int XZNumBufferSize = ((int)BBox[1].x - (int)BBox[0].x) * ((int)BBox[1].z - (int)BBox[0].z);
+	cudaCheck(cudaMalloc((void**)&cudaXZPlaneBuffer, XZNumBufferSize * sizeof(SurfelData)));
+	cudaCheck(cudaMemset((void**)&cudaXZPlaneBuffer, 0, XZNumBufferSize * sizeof(SurfelData)));
+	SurfelData* cudaXYPlaneBuffer;
+	int XYNumBufferSize = ((int)BBox[1].x - (int)BBox[0].x) * ((int)BBox[1].y - (int)BBox[0].y);
+	cudaCheck(cudaMalloc((void**)&cudaXYPlaneBuffer, XYNumBufferSize * sizeof(SurfelData)));
+	cudaCheck(cudaMemset((void**)&cudaXYPlaneBuffer, 0, XYNumBufferSize * sizeof(SurfelData)));
+	rtBindRasterizeBufferData(cudaYZPlaneBuffer, cudaXZPlaneBuffer, cudaXYPlaneBuffer);
 	
 	rtBindRasterizeData(cudaLocalPos, cudaUVs, cudaTriangleIndex, cudaBBox, NumVertices, NumTriangles, GridElementSize);
 

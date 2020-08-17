@@ -1,5 +1,34 @@
 #pragma once
 
+__global__ bool PointInTriangle(float3 A, float3 B, float3 C, float3 P)
+{
+	// Prepare our barycentric variables
+	float3 u = B - A;
+	float3 v = C - A;
+	float3 w = P - A;
+
+	float3 vCrossW = cross(v, w);
+	float3 vCrossU = cross(v, u);
+
+	// Test sign of r
+	if (dot(vCrossW, vCrossU) < 0)
+		return false;
+
+	float3 uCrossW = cross(u, w);
+	float3 uCrossV = cross(u, v);
+
+	// Test sign of t
+	if (dot(uCrossW, uCrossV) < 0)
+		return false;
+
+	// At this point, we know that r and t and both > 0.
+	// Therefore, as long as their sum is <= 1, each must be less <= 1
+	float denom = length(uCrossV);
+	float r = length(vCrossW) / denom;
+	float t = length(uCrossW) / denom;
+
+	return (r + t <= 1);
+}
 __global__ void rtVertexTransform()
 {
 	int vertex_id = blockIdx.x * blockDim.x + threadIdx.x;
