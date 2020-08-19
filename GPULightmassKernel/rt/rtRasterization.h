@@ -98,8 +98,6 @@ __device__ void interplate_triangle_buffer(const int2 &lb, const int2 &rt,
 	int w = rt.x - lb.x;
 	int h = rt.y - lb.y;
 
-	printf("xxxxxxxxxxxxxxxxxxxxxxx");
-
 	for (int i = lb.y; i < rt.y; ++i)
 	{
 		for (int j = lb.x; j < rt.x; ++j)
@@ -120,9 +118,7 @@ __device__ void interplate_triangle_buffer(const int2 &lb, const int2 &rt,
 
 				//get output index
 				int index_out_texel = (i - lb.y) * w + (j - lb.x);
-				//surfel_data[index_out_texel].pos = out_interplate_pos;
-				surfel_data[index_out_texel].pos = make_float3(0, 0, 0);
-				surfel_data[index_out_texel].normal.x = index_out_texel;
+				surfel_data[index_out_texel].pos = out_interplate_pos;				
 			}
 		}
 	}
@@ -144,8 +140,6 @@ __global__ void PlaneRasterization()
 
 	if (triangle_index < RasNumTriangles)
 	{
-		printf("triangle index %d\n", triangle_index);
-
 		int index_0 = RasTriangleIndexs[triangle_index * 3];
 		int index_1 = RasTriangleIndexs[triangle_index * 3 + 1];
 		int index_2 = RasTriangleIndexs[triangle_index * 3 + 2];

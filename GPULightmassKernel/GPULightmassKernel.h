@@ -6,58 +6,7 @@ namespace GPULightmass
 #ifdef GPULIGHTMASSKERNEL_LIB
 #define GPULIGHTMASSKERNEL_API extern "C" __declspec(dllexport)
 #else
-
 #define GPULIGHTMASSKERNEL_API extern "C" __declspec(dllimport)
-
-	struct int3
-	{
-		int x, y, z;
-	};
-
-	struct float2
-	{
-		float x, y;
-	};
-
-	struct float3
-	{
-		float x, y, z;
-	};
-
-	struct float4
-	{
-		float x, y, z, w;
-	};
-
-	float3 make_float3(float x, float y, float z)
-	{
-		float3 f;
-		f.x = x;
-		f.y = y;
-		f.z = z;
-
-		return f;
-	}
-
-	float2 make_float2(float x, float y)
-	{
-		float2 f;
-		f.x = x;
-		f.y = y;
-
-		return f;
-	}
-
-	int3 make_int3(int x, int y, int z)
-	{
-		int3 f;
-		f.x = x;
-		f.y = y;
-		f.z = z;
-
-		return f;
-	}
-
 #endif
 
 struct shvector2

@@ -86,7 +86,7 @@ void WriteHDR(std::string fileName, const float4* buffer, int Width, int Height)
 #include "StringUtils.h"
 
 namespace GPULightmass
-{
+{	
 
 GPULightmassLogHandler GLogHandler = nullptr;
 
@@ -506,7 +506,6 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, co
 
 
 	//copy mem to host
-	int memory_size = YZNumBufferSize * sizeof(GPULightmass::SurfelData);
 	cudaCheck(cudaMemcpy(OutSurfelData, cudaYZPlaneBuffer, YZNumBufferSize * sizeof(GPULightmass::SurfelData), cudaMemcpyDeviceToHost));
 	OutNumberSurfel[0] = YZNumBufferSize;
 
