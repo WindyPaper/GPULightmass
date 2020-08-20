@@ -508,6 +508,6 @@ __host__ void rtBindRasterizeBufferData(
 )
 {
 	cudaCheck(cudaMemcpyToSymbol(RasYZPlaneBuffer, &YZPlane, sizeof(YZPlane)));
-	//cudaCheck(cudaMemcpyToSymbol(RasXZPlaneBuffer, &XZPlane, sizeof(XZPlane)));
-	//cudaCheck(cudaMemcpyToSymbol(RasXYPlaneBuffer, &XYPlane, sizeof(XYPlane)));
+	cudaCheck(cudaMemcpyToSymbol(RasXZPlaneBuffer, &XZPlane, sizeof(XZPlane)));
+	cudaCheck(cudaMemcpyToSymbol(RasXYPlaneBuffer, &XYPlane, sizeof(XYPlane)));
 }

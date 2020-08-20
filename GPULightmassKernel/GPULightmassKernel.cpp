@@ -2,6 +2,7 @@
 #include <vector>
 #include <algorithm>
 #include <time.h>
+#include <fstream>
 
 #define GPULIGHTMASSKERNEL_LIB
 
@@ -464,9 +465,25 @@ GPULIGHTMASSKERNEL_API void CalculateAllLightingAndShadow(
 	ReportCurrentFinishedTexels(NumTexelsInCurrentBatch);
 }
 
+GPULIGHTMASSKERNEL_API bool CreateCache(const int NumVertices, const int NumTriangles, const float3 VertexLocalPositionBuffer[], const int3 TriangleIndexBuffer[], const float3 BBox[])
+{
+	std::ofstream ofs;
+	ofs.open("./model_cache.bin", std::ios_base::binary);
+	ofs << NumVertices;
+	ofs.write((const char*)VertexLocalPositionBuffer, sizeof(float3) * NumVertices);
+	ofs << NumTriangles;
+	ofs.write((const char*)TriangleIndexBuffer, sizeof(int3) * NumTriangles);
+	ofs.write((const char*)BBox, sizeof(float3) * 2);
+	ofs.close();
+
+	return true;
+}
+
 GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, const int NumVertices, const int NumTriangles, const float3 VertexLocalPositionBuffer[], const float2 VertexTextureUVBuffer[], const int3 TriangleIndexBuffer[], const int TriangleTextureMappingIndex[], const float3 BBox[], 
 	int OutNumberSurfel[], GPULightmass::SurfelData *OutSurfelData)
 {
+	CreateCache(NumVertices, NumTriangles, VertexLocalPositionBuffer, TriangleIndexBuffer, BBox);
+
 	float3 *cudaLocalPos;
 	float2 *cudaUVs;
 	int *cudaTriangleIndex;
@@ -479,11 +496,11 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, co
 	float3 maxBBox[2];
 	maxBBox[0] = make_float3(std::floor(BBox[0].x / GridElementSize), std::floor(BBox[0].y / GridElementSize), std::floor(BBox[0].z / GridElementSize));
 	maxBBox[1] = make_float3(std::ceil(BBox[1].x / GridElementSize), std::ceil(BBox[1].y / GridElementSize), std::ceil(BBox[1].z / GridElementSize));
-
-	cudaCheck(cudaMemcpyAsync(cudaLocalPos, VertexLocalPositionBuffer, NumVertices * sizeof(float3), cudaMemcpyHostToDevice));
-	cudaCheck(cudaMemcpyAsync(cudaUVs, VertexTextureUVBuffer, NumVertices * sizeof(float2), cudaMemcpyHostToDevice));
-	cudaCheck(cudaMemcpyAsync(cudaTriangleIndex, TriangleIndexBuffer, NumTriangles * 3 * sizeof(int), cudaMemcpyHostToDevice));	
-	cudaCheck(cudaMemcpyAsync(cudaBBox, maxBBox, 2 * sizeof(float3), cudaMemcpyHostToDevice));
+	
+	cudaCheck(cudaMemcpy(cudaLocalPos, VertexLocalPositionBuffer, NumVertices * sizeof(float3), cudaMemcpyHostToDevice));
+	cudaCheck(cudaMemcpy(cudaUVs, VertexTextureUVBuffer, NumVertices * sizeof(float2), cudaMemcpyHostToDevice));
+	cudaCheck(cudaMemcpy(cudaTriangleIndex, TriangleIndexBuffer, NumTriangles * 3 * sizeof(int), cudaMemcpyHostToDevice));
+	cudaCheck(cudaMemcpy(cudaBBox, maxBBox, 2 * sizeof(float3), cudaMemcpyHostToDevice));
 
 	//buffer
 	GPULightmass::SurfelData *cudaYZPlaneBuffer;
