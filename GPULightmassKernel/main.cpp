@@ -90,6 +90,8 @@ void test_cache()
 	int out_surf_num[1];
 	GPULightmass::SurfelData* pSurfData = new GPULightmass::SurfelData[256];
 	GPULightmass::RasterizeModelToSurfel(10, vertices_num, triangle_num, vertices_data, uvs, triangle_data, (const int*)triangle_data, bbox, out_surf_num, pSurfData);
+
+
 	typedef unsigned char RGB[3];
 	RGB pixel[100];
 	memset(pixel, 0, sizeof(pixel));
@@ -125,8 +127,8 @@ void test_cache()
 //only for unit test
 int main()
 {	
-	//test_cache();
-	test_simple_triangle();
+	test_cache();
+	//test_simple_triangle();
 
 	return 0;
 }

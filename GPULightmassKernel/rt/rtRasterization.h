@@ -71,8 +71,8 @@ __device__ float4 GetBBox(const float2 &p0, const float2 &p1, const float2 &p2) 
 		max(max(p0.y, p1.y), p2.y)
 	);
 
-	return make_float4(min_max_value_x.x, min_max_value_y.x,
-		min_max_value_x.y, min_max_value_y.y);
+	return make_float4(floor(min_max_value_x.x), floor(min_max_value_y.x),
+		ceil(min_max_value_x.y), ceil(min_max_value_y.y));
 }
 
 __device__ float edgeFunction(const float2 &c, const float2 &b, const float2 &a)
@@ -95,8 +95,10 @@ __device__ void interplate_triangle_buffer(const int2 &lb, const int2 &rt,
 {
 	float area = edgeFunction(p0, p1, p2);
 
-	int w = rt.x - lb.x;
-	int h = rt.y - lb.y;
+	int w = RasBBox[1].x - RasBBox[0].x;
+	int h = RasBBox[1].y - RasBBox[0].y;
+
+	//printf("(%d, %d) (%d, %d) w = %d, h = %d\n", lb.x, lb.y, rt.x, rt.y, w, h);
 
 	for (int i = lb.y; i < rt.y; ++i)
 	{
@@ -117,7 +119,8 @@ __device__ void interplate_triangle_buffer(const int2 &lb, const int2 &rt,
 				float3 out_interplate_pos = interplate_float3(local_pos0, local_pos1, local_pos2, make_float3(w0, w1, w2));
 
 				//get output index
-				int index_out_texel = (i - lb.y) * w + (j - lb.x);
+				int index_out_texel = (i - RasBBox[0].y) * w + (j - RasBBox[0].x);
+				//printf("index_out_texel = %d\n", index_out_texel);
 				surfel_data[index_out_texel].pos = out_interplate_pos;				
 			}
 		}
@@ -136,7 +139,7 @@ __global__ void rtVertexTransform()
 
 __global__ void PlaneRasterization()
 {
-	int triangle_index = blockIdx.x * blockDim.x + threadIdx.x;
+	int triangle_index = blockIdx.x * blockDim.x + threadIdx.x;	
 
 	if (triangle_index < RasNumTriangles)
 	{
