@@ -209,6 +209,7 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(
 	const int NumVertices,
 	const int NumTriangles,
 	const float3 VertexLocalPositionBuffer[],
+	const float3 VertexLocalNormalBuffer[],
 	const float2 VertexTextureUVBuffer[],
 	const int3 TriangleIndexBuffer[],
 	const int TriangleTextureMappingIndex[],
