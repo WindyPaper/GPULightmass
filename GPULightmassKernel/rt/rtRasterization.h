@@ -89,14 +89,14 @@ __device__ float3 interplate_float3(const float3 &v0, const float3 &v1, const fl
 	);
 }
 
-__device__ void interplate_triangle_buffer(const int2 &lb, const int2 &rt, 
+__device__ void interplate_triangle_buffer(const int w, const int y, const int2 &lb, const int2 &rt, 
 	const float2 &p0, const float2 &p1, const float2 &p2, 
 	const int index0, const int index1, const int index2, GPULightmass::SurfelData* surfel_data)
 {
 	float area = edgeFunction(p0, p1, p2);
 
-	int w = RasBBox[1].x - RasBBox[0].x;
-	int h = RasBBox[1].y - RasBBox[0].y;
+	//int w = RasBBox[1].x - RasBBox[0].x;
+	//int h = RasBBox[1].y - RasBBox[0].y;
 
 	//printf("(%d, %d) (%d, %d) w = %d, h = %d\n", lb.x, lb.y, rt.x, rt.y, w, h);
 
@@ -118,10 +118,15 @@ __device__ void interplate_triangle_buffer(const int2 &lb, const int2 &rt,
 				float3 local_pos2 = RasVertexLocalPos[index2];
 				float3 out_interplate_pos = interplate_float3(local_pos0, local_pos1, local_pos2, make_float3(w0, w1, w2));
 
+				float3 local_normal0 = RasVertexNormals[index0];
+				float3 local_normal1 = RasVertexNormals[index1];
+				float3 local_normal2 = RasVertexNormals[index2];
+				float3 out_interplate_normal = interplate_float3(local_normal0, local_normal1, local_normal2, make_float3(w0, w1, w2));
+
 				//get output index
 				int index_out_texel = (i - RasBBox[0].y) * w + (j - RasBBox[0].x);
-				//printf("index_out_texel = %d\n", index_out_texel);
-				surfel_data[index_out_texel].pos = out_interplate_pos;				
+				surfel_data[index_out_texel].pos = make_float4(out_interplate_pos, 1.0f);
+				surfel_data[index_out_texel].normal = make_float4(out_interplate_normal);
 			}
 		}
 	}
@@ -158,7 +163,9 @@ __global__ void PlaneRasterization()
 		float2 yz_p2 = make_float2(p2.y, p2.z) / RasGridElementSize;
 
 		float4 min_max_value = GetBBox(yz_p0, yz_p1, yz_p2);
-		interplate_triangle_buffer(make_int2(min_max_value.x, min_max_value.y), make_int2(min_max_value.z, min_max_value.w),
+		int w = RasBBox[1].y - RasBBox[0].y;
+		int h = RasBBox[1].z - RasBBox[0].z;
+		interplate_triangle_buffer(w, h, make_int2(min_max_value.x, min_max_value.y), make_int2(min_max_value.z, min_max_value.w),
 			yz_p0, yz_p1, yz_p2, index_0, index_1, index_2, RasYZPlaneBuffer);	
 		//RasYZPlaneBuffer[0].pos = make_float3(100.0f, 100.0f, 100.0f);
 	}

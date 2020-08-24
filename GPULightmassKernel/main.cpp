@@ -41,7 +41,7 @@ void test_simple_triangle()
 	int out_surf_num[1];
 	out_surf_num[0] = surfel_num;
 
-	GPULightmass::RasterizeModelToSurfel(10, vertices_num, triangle_num, vertex_pos, uvs, index, &(index[0].x), bbox, out_surf_num, pSurfData);
+	GPULightmass::RasterizeModelToSurfel(10, vertices_num, triangle_num, vertex_pos, vertex_pos, uvs, index, &(index[0].x), bbox, out_surf_num, pSurfData);
 
 	typedef unsigned char RGB[3];
 	RGB pixel[100];
@@ -89,12 +89,13 @@ void test_cache()
 	float2 *uvs = new float2[vertices_num];
 	int out_surf_num[1];
 	GPULightmass::SurfelData* pSurfData = new GPULightmass::SurfelData[256];
-	GPULightmass::RasterizeModelToSurfel(10, vertices_num, triangle_num, vertices_data, uvs, triangle_data, (const int*)triangle_data, bbox, out_surf_num, pSurfData);
+	GPULightmass::RasterizeModelToSurfel(10, vertices_num, triangle_num, vertices_data, vertices_data, uvs, triangle_data, (const int*)triangle_data, bbox, out_surf_num, pSurfData);
 
+	int image_size = std::ceil(std::sqrtf(out_surf_num[0] * 1.0f));
 
 	typedef unsigned char RGB[3];
-	RGB pixel[100];
-	memset(pixel, 0, sizeof(pixel));
+	RGB *pixel = new RGB[out_surf_num[0]];
+	memset(pixel, 0, sizeof(RGB) * out_surf_num[0]);
 
 	for (int i = 0; i < out_surf_num[0]; ++i)
 	{
@@ -108,8 +109,8 @@ void test_cache()
 		pixel[i][2] = (unsigned char)((pSurfData[i].pos.z / 50 * 0.5 + 0.5) * 255);
 	}
 
-	const int w = 10;
-	const int h = 10;
+	const int w = image_size;
+	const int h = image_size;
 	std::ofstream ofs;
 	ofs.open("./raster2d.ppm", std::ios_base::binary);
 	ofs << "P6\n" << w << " " << h << "\n255\n";

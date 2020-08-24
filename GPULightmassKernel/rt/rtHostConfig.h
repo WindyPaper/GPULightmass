@@ -483,6 +483,7 @@ __host__ void cudaGenerateSignedDistanceFieldVolumeData(Vec3f BoundingBoxMin, Ve
 
 __host__ void rtBindRasterizeData(
 	const float3 *VertexData,
+	const float3 *VertexNormal,
 	const float2 *UVs,
 	const int *TriangleIndex,
 	const float3 *Bbox,
@@ -492,6 +493,7 @@ __host__ void rtBindRasterizeData(
 )
 {
 	cudaCheck(cudaMemcpyToSymbol(RasVertexLocalPos, &VertexData, sizeof(VertexData)));
+	cudaCheck(cudaMemcpyToSymbol(RasVertexNormals, &VertexNormal, sizeof(VertexNormal)));
 	cudaCheck(cudaMemcpyToSymbol(RasVertexUVs, &UVs, sizeof(UVs)));
 	cudaCheck(cudaMemcpyToSymbol(RasTriangleIndexs, &TriangleIndex, sizeof(TriangleIndex)));
 	cudaCheck(cudaMemcpyToSymbol(RasBBox, &Bbox, sizeof(Bbox)));

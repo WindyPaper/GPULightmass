@@ -65,6 +65,7 @@ __constant__ int* TriangleMappingIndex;
 __constant__ int* TriangleIndexBuffer;
 
 __device__ float3* RasVertexLocalPos;
+__device__ float3* RasVertexNormals;
 __constant__ float2* RasVertexUVs;
 __device__ int* RasTriangleIndexs;
 __constant__ float3* RasBBox;
