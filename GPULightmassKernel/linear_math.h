@@ -243,6 +243,8 @@ public:
 	inline    void				  setCol3(const Vec4f& v) { m30 = v.x; m31 = v.y; m32 = v.z; m33 = v.w; }
 	inline    void                setRow(int r, const Vec4f& v);
 	inline    void                set(const Mat4f& v) { set(v.getPtr()); }
+	inline	  void				  orthoMatrix(const float &b, const float &t, const float &l, const float &r, const float &n, const float &f);
+	inline	  void				  cameraMatrix(const Vec3f &lookat, const Vec3f &pos);
 	inline    Mat4f&              operator=   (const float& a) { set(a); return *(Mat4f*)this; }
 	inline    Mat4f               operator*   (const float& a) const { Mat4f r; for (int i = 0; i < 4 * 4; i++) r.get(i) = get(i) * a; return r; }
 	inline    const float&        operator()  (int r, int c) const { return get(r, c); }
@@ -332,6 +334,23 @@ void Mat4f::setRow(int idx, const Vec4f& v)
 {
 	for (int i = 0; i < 4; i++)
 		get(idx, i) = v._v[i];
+}
+
+void Mat4f::orthoMatrix(const float &b, const float &t, const float &l, const float &r, const float &n, const float &f)
+{
+	setIdentity();
+	get(0, 0) = 2.0f / (r - l);
+	get(1, 1) = 2.0f / (t - b);
+	get(2, 2) = -2.0f / (f - n);
+	
+	get(0, 3) = -(r + l) / (r - l);
+	get(1, 3) = -(t + b) / (t - b);
+	get(2, 3) = -(f + n) / (f - n);
+}
+
+void Mat4f::cameraMatrix(const Vec3f &lookat, const Vec3f &pos)
+{
+
 }
 
 Mat4f Mat4f::operator*(const Mat4f& v)
