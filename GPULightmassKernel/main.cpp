@@ -73,7 +73,7 @@ void test_simple_triangle()
 void test_cache()
 {
 	std::ifstream ins;
-	ins.open("./model_cache.bin", std::ios_base::binary);
+	ins.open("./model_cache.bin", std::ios_base::in | std::ios_base::binary);
 	int vertices_num, triangle_num;
 	ins >> vertices_num;
 	float3 *vertices_data = new float3[vertices_num];

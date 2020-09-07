@@ -489,7 +489,8 @@ __host__ void rtBindRasterizeData(
 	const float3 *Bbox,
 	const int NumVertices,
 	const int NumTriangles,
-	const int GridElementSize
+	const int GridElementSize,
+	const Mat4f *ViewMat
 )
 {
 	cudaCheck(cudaMemcpyToSymbol(RasVertexLocalPos, &VertexData, sizeof(VertexData)));
@@ -501,6 +502,8 @@ __host__ void rtBindRasterizeData(
 	cudaCheck(cudaMemcpyToSymbol(RasNumVertices, &NumVertices, sizeof(NumVertices)));
 	cudaCheck(cudaMemcpyToSymbol(RasNumTriangles, &NumTriangles, sizeof(NumTriangles)));
 	cudaCheck(cudaMemcpyToSymbol(RasGridElementSize, &GridElementSize, sizeof(GridElementSize)));
+
+	cudaCheck(cudaMemcpyToSymbol(RasViewMat, &ViewMat, sizeof(ViewMat)));
 }
 
 __host__ void rtBindRasterizeBufferData(

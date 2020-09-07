@@ -75,7 +75,7 @@ __device__ float4 GetBBox(const float2 &p0, const float2 &p1, const float2 &p2) 
 		ceil(min_max_value_x.y), ceil(min_max_value_y.y));
 }
 
-__device__ float edgeFunction(const float2 &c, const float2 &b, const float2 &a)
+__device__ float edgeFunction(const float2 &a, const float2 &b, const float2 &c)
 {
 	return (c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x);
 }
@@ -89,7 +89,7 @@ __device__ float3 interplate_float3(const float3 &v0, const float3 &v1, const fl
 	);
 }
 
-__device__ void interplate_triangle_buffer(const int w, const int y, const int2 &lb, const int2 &rt, 
+__device__ void interplate_triangle_buffer(const int w, const int h, const int2 &lb, const int2 &rt, 
 	const float2 &p0, const float2 &p1, const float2 &p2, 
 	const int index0, const int index1, const int index2, GPULightmass::SurfelData* surfel_data)
 {
@@ -98,17 +98,18 @@ __device__ void interplate_triangle_buffer(const int w, const int y, const int2 
 	//int w = RasBBox[1].x - RasBBox[0].x;
 	//int h = RasBBox[1].y - RasBBox[0].y;
 
-	//printf("(%d, %d) (%d, %d) w = %d, h = %d\n", lb.x, lb.y, rt.x, rt.y, w, h);
+	printf("(%d, %d) (%d, %d) w = %d, h = %d, (%f, %f), (%f, %f), (%f, %f)\n", 
+		lb.x, lb.y, rt.x, rt.y, w, h, p0.x, p0.y, p1.x, p1.y, p2.x, p2.y);
 
-	for (int i = lb.y; i < rt.y; ++i)
+	for (int i = lb.y; i <= rt.y; ++i)
 	{
-		for (int j = lb.x; j < rt.x; ++j)
+		for (int j = lb.x; j <= rt.x; ++j)
 		{
 			float2 p = { j + 0.5f, i + 0.5f };
 			float w0 = edgeFunction(p1, p2, p);
 			float w1 = edgeFunction(p2, p0, p);
 			float w2 = edgeFunction(p0, p1, p);
-			if (w0 >= 0 && w1 >= 0 && w2 >= 0) {
+			if (w0 >= 0.0f && w1 >= 0.0f && w2 >= 0.0f) {
 				w0 /= area;
 				w1 /= area;
 				w2 /= area;
@@ -127,9 +128,34 @@ __device__ void interplate_triangle_buffer(const int w, const int y, const int2 
 				int index_out_texel = (i - RasBBox[0].y) * w + (j - RasBBox[0].x);
 				surfel_data[index_out_texel].pos = make_float4(out_interplate_pos, 1.0f);
 				surfel_data[index_out_texel].normal = make_float4(out_interplate_normal);
+
+				printf("write pixel (%d, %d)\n", j, i);
+			}
+			else
+			{
+				//printf("No pixel (%d, %d)\n", j, i);
 			}
 		}
 	}
+}
+
+__device__ void transform_vertex(const Mat4f& m, float3& p)
+{
+	const Vec4f p4f = Vec4f(p.x, p.y, p.z, 1.0f);
+	Vec4f t1 = m * p4f;
+	p = make_float3(t1.x / t1.w, t1.y / t1.w, t1.z / t1.w);
+}
+
+__device__ void toOrthoProjectSpace( float3& p0, float3& p1, float3& p2)
+{
+	Mat4f ortho_m;
+	ortho_m.orthoMatrix(RasBBox[0].z, RasBBox[1].z, RasBBox[0].x, RasBBox[1].x, RasBBox[0].y, RasBBox[1].y);
+	//Mat4f vp_mat = ortho_m * (*RasViewMat);
+	Mat4f vp_mat = (*RasViewMat);//先不归一化
+
+	transform_vertex(vp_mat, p0);
+	transform_vertex(vp_mat, p1);
+	transform_vertex(vp_mat, p2);
 }
 
 __global__ void rtVertexTransform()
@@ -156,17 +182,21 @@ __global__ void PlaneRasterization()
 		float3 p1 = RasVertexLocalPos[index_1];
 		float3 p2 = RasVertexLocalPos[index_2];
 
-		//map to yz plane
-		//int2 yz_wh = make_int2((int)RasBBox[1].y - (int)RasBBox[0].y, (int)RasBBox[1].z - (int)RasBBox[0].z); //buffer size
-		float2 yz_p0 = make_float2(p0.y, p0.z) / RasGridElementSize;
-		float2 yz_p1 = make_float2(p1.y, p1.z) / RasGridElementSize;
-		float2 yz_p2 = make_float2(p2.y, p2.z) / RasGridElementSize;
+		toOrthoProjectSpace(p0, p1, p2);
 
-		float4 min_max_value = GetBBox(yz_p0, yz_p1, yz_p2);
-		int w = RasBBox[1].y - RasBBox[0].y;
+		float2 p0_on_plane = make_float2(p0.x, p0.z) / RasGridElementSize;
+		float2 p1_on_plane = make_float2(p1.x, p1.z) / RasGridElementSize;
+		float2 p2_on_plane = make_float2(p2.x, p2.z) / RasGridElementSize;
+		
+		float4 min_max_value = GetBBox(p0_on_plane, p1_on_plane, p2_on_plane);
+
+		printf("(%f, %f, %f), (%f, %f, %f), (%f, %f, %f), bbox = (%f, %f), (%f, %f)\n\n",
+			p0.x, p0.y, p0.z, p1.x, p1.y, p1.z, p2.x, p2.y, p2.z, min_max_value.x, min_max_value.y, min_max_value.z, min_max_value.w);
+
+		int w = RasBBox[1].x - RasBBox[0].x;
 		int h = RasBBox[1].z - RasBBox[0].z;
 		interplate_triangle_buffer(w, h, make_int2(min_max_value.x, min_max_value.y), make_int2(min_max_value.z, min_max_value.w),
-			yz_p0, yz_p1, yz_p2, index_0, index_1, index_2, RasYZPlaneBuffer);	
+			p0_on_plane, p1_on_plane, p2_on_plane, index_0, index_1, index_2, RasXZPlaneBuffer);
 		//RasYZPlaneBuffer[0].pos = make_float3(100.0f, 100.0f, 100.0f);
 	}
 }
@@ -181,11 +211,10 @@ __host__ void rtRasterizeModel(const int NumVertices, const int NumTriangles)
 	CalculateDirectLighting << <gridDim, blockDim >> > ();*/
 
 	//vertex transform
-	//int NumVerticesSqrt = std::ceil(std::sqrtf(NumVertices));
-	//dim3 blockDim(NumVerticesSqrt);
-	//dim3 gridDim(NumVerticesSqrt);
-
-	//rtVertexTransform << <gridDim, blockDim >> > ();
+	/*int NumVerticesSqrt = std::ceil(std::sqrtf(NumVertices));
+	dim3 blockDimVertices(NumVerticesSqrt);
+	dim3 gridDimVertices(NumVerticesSqrt);
+	rtVertexTransform << <gridDimVertices, blockDimVertices >> > ();*/
 
 	const int Stride = 64;
 	dim3 blockDim(Stride, 1);

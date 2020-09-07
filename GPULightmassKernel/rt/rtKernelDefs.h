@@ -72,10 +72,11 @@ __constant__ float3* RasBBox;
 __device__ int RasNumVertices;
 __device__ int RasNumTriangles;
 __device__ int RasGridElementSize;
+__device__ Mat4f* RasViewMat;
 
-__constant__ GPULightmass::SurfelData* RasYZPlaneBuffer;
-__constant__ GPULightmass::SurfelData* RasXZPlaneBuffer;
-__constant__ GPULightmass::SurfelData* RasXYPlaneBuffer;
+__device__ GPULightmass::SurfelData* RasYZPlaneBuffer;
+__device__ GPULightmass::SurfelData* RasXZPlaneBuffer;
+__device__ GPULightmass::SurfelData* RasXYPlaneBuffer;
 
 //__constant__ float4** GatheringRadiosityBuffers;
 //__constant__ float4** ShootingRadiosityBuffers;

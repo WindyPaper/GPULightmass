@@ -59,14 +59,15 @@ __host__ void rtBindSampleData(
 );
 
 __host__ void rtBindRasterizeData(
-	const float3 *VertexData,
+	const float3* VertexData,
 	const float3* VertexNormal,
-	const float2 *UVs,
-	const int *TriangleIndex,
-	const float3 *Bbox,
+	const float2* UVs,
+	const int* TriangleIndex,
+	const float3* Bbox,
 	const int NumVertices,
 	const int NumTriangles,
-	const int GridElementSize
+	const int GridElementSize,
+	const Mat4f* ViewMat
 );
 
 __host__ void rtBindRasterizeBufferData(
@@ -469,12 +470,13 @@ GPULIGHTMASSKERNEL_API void CalculateAllLightingAndShadow(
 GPULIGHTMASSKERNEL_API bool CreateCache(const int NumVertices, const int NumTriangles, const float3 VertexLocalPositionBuffer[], const int3 TriangleIndexBuffer[], const float3 BBox[])
 {
 	std::ofstream ofs;
-	ofs.open("./model_cache.bin", std::ios_base::binary);
+	ofs.open("./model_cache.bin", std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
 	ofs << NumVertices;
 	ofs.write((const char*)VertexLocalPositionBuffer, sizeof(float3) * NumVertices);
 	ofs << NumTriangles;
 	ofs.write((const char*)TriangleIndexBuffer, sizeof(int3) * NumTriangles);
 	ofs.write((const char*)BBox, sizeof(float3) * 2);
+	ofs.flush();
 	ofs.close();
 
 	return true;
@@ -497,9 +499,39 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, co
 	cudaCheck(cudaMalloc((void**)&cudaTriangleIndex, NumTriangles * 3 * sizeof(int)));
 	cudaCheck(cudaMalloc((void**)&cudaBBox, 2 * sizeof(float3)));
 	
+	//bbox to camera and ortho projection to determine plane size
+	Mat4f camera_m;
+	camera_m.cameraMatrix(Vec3f(0.0f, 0.0f, -1.0f), Vec3f(0.0f, 0.0f, 0.0f));
+	Vec4f camera_base_bbox[2];
+	camera_base_bbox[0] = camera_m * Vec4f(BBox[0].x, BBox[0].y, BBox[0].z, 1.0f);
+	camera_base_bbox[1] = camera_m * Vec4f(BBox[1].x, BBox[1].y, BBox[1].z, 1.0f);
+	float3 camera_base_max_box = make_float3(
+		std::max(camera_base_bbox[0].x, camera_base_bbox[1].x),
+		std::max(camera_base_bbox[0].y, camera_base_bbox[1].y),
+		std::max(camera_base_bbox[0].z, camera_base_bbox[1].z));
+	float3 camera_base_min_box = make_float3(
+		std::min(camera_base_bbox[0].x, camera_base_bbox[1].x),
+		std::min(camera_base_bbox[0].y, camera_base_bbox[1].y),
+		std::min(camera_base_bbox[0].z, camera_base_bbox[1].z));
+	//Mat4f ortho_m;
+
 	float3 maxBBox[2];
-	maxBBox[0] = make_float3(std::floor(BBox[0].x / GridElementSize), std::floor(BBox[0].y / GridElementSize), std::floor(BBox[0].z / GridElementSize));
-	maxBBox[1] = make_float3(std::ceil(BBox[1].x / GridElementSize), std::ceil(BBox[1].y / GridElementSize), std::ceil(BBox[1].z / GridElementSize));
+	maxBBox[0] = make_float3(
+		std::floor(camera_base_min_box.x / GridElementSize), 
+		std::floor(camera_base_min_box.y / GridElementSize),
+		std::floor(camera_base_min_box.z / GridElementSize));
+	maxBBox[1] = make_float3(
+		std::ceil(camera_base_max_box.x / GridElementSize),
+		std::ceil(camera_base_max_box.y / GridElementSize),
+		std::ceil(camera_base_max_box.z / GridElementSize));
+	/*maxBBox[0] = make_float3(
+		std::floor(BBox[0].x / GridElementSize),
+		std::floor(BBox[0].y / GridElementSize),
+		std::floor(BBox[0].z / GridElementSize));
+	maxBBox[1] = make_float3(
+		std::ceil(BBox[1].x / GridElementSize),
+		std::ceil(BBox[1].y / GridElementSize),
+		std::ceil(BBox[1].z / GridElementSize));*/
 	
 	cudaCheck(cudaMemcpy(cudaLocalPos, VertexLocalPositionBuffer, NumVertices * sizeof(float3), cudaMemcpyHostToDevice));
 	cudaCheck(cudaMemcpy(cudaNormal, VertexLocalNormalBuffer, NumVertices * sizeof(float3), cudaMemcpyHostToDevice));
@@ -508,27 +540,32 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, co
 	cudaCheck(cudaMemcpy(cudaBBox, maxBBox, 2 * sizeof(float3), cudaMemcpyHostToDevice));
 
 	//buffer
-	GPULightmass::SurfelData *cudaYZPlaneBuffer;
+	GPULightmass::SurfelData *cudaYZPlaneBuffer; //test
 	int YZNumBufferSize = ((int)maxBBox[1].y - (int)maxBBox[0].y) * ((int)maxBBox[1].z - (int)maxBBox[0].z);
 	cudaCheck(cudaMalloc((void**)&cudaYZPlaneBuffer, YZNumBufferSize * sizeof(GPULightmass::SurfelData)));
 	cudaCheck(cudaMemset(cudaYZPlaneBuffer, 0, YZNumBufferSize * sizeof(GPULightmass::SurfelData)));
-	GPULightmass::SurfelData* cudaXZPlaneBuffer;
+
+	GPULightmass::SurfelData* cudaXZPlaneBuffer; // map to camera
 	int XZNumBufferSize = ((int)maxBBox[1].x - (int)maxBBox[0].x) * ((int)maxBBox[1].z - (int)maxBBox[0].z);
 	cudaCheck(cudaMalloc(&cudaXZPlaneBuffer, XZNumBufferSize * sizeof(GPULightmass::SurfelData)));
 	cudaCheck(cudaMemset(cudaXZPlaneBuffer, 0, XZNumBufferSize * sizeof(GPULightmass::SurfelData)));
+
 	GPULightmass::SurfelData* cudaXYPlaneBuffer;
 	int XYNumBufferSize = ((int)maxBBox[1].x - (int)maxBBox[0].x) * ((int)maxBBox[1].y - (int)maxBBox[0].y);
 	cudaCheck(cudaMalloc(&cudaXYPlaneBuffer, XYNumBufferSize * sizeof(GPULightmass::SurfelData)));
 	cudaCheck(cudaMemset(cudaXYPlaneBuffer, 0, XYNumBufferSize * sizeof(GPULightmass::SurfelData)));
 	rtBindRasterizeBufferData(cudaYZPlaneBuffer, cudaXZPlaneBuffer, cudaXYPlaneBuffer);
 	
-	rtBindRasterizeData(cudaLocalPos, cudaNormal, cudaUVs, cudaTriangleIndex, cudaBBox, NumVertices, NumTriangles, GridElementSize);
+	Mat4f* cudaViewMat;
+	cudaCheck(cudaMalloc(&cudaViewMat, sizeof(Mat4f)));
+	cudaCheck(cudaMemcpy(cudaViewMat, &camera_m, sizeof(Mat4f), cudaMemcpyHostToDevice));
+	rtBindRasterizeData(cudaLocalPos, cudaNormal, cudaUVs, cudaTriangleIndex, cudaBBox, NumVertices, NumTriangles, GridElementSize, cudaViewMat);
 
 	rtRasterizeModel(NumVertices, NumTriangles);
 
 	//copy mem to host
-	cudaCheck(cudaMemcpy(OutSurfelData, cudaYZPlaneBuffer, YZNumBufferSize * sizeof(GPULightmass::SurfelData), cudaMemcpyDeviceToHost));
-	OutNumberSurfel[0] = YZNumBufferSize;	
+	cudaCheck(cudaMemcpy(OutSurfelData, cudaXZPlaneBuffer, XZNumBufferSize * sizeof(GPULightmass::SurfelData), cudaMemcpyDeviceToHost));
+	OutNumberSurfel[0] = XZNumBufferSize;	
 
 	//release buffer
 	cudaCheck(cudaFree(cudaXYPlaneBuffer));
@@ -539,7 +576,8 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, co
 	cudaCheck(cudaFree(cudaTriangleIndex));
 	cudaCheck(cudaFree(cudaBBox));
 	cudaCheck(cudaFree(cudaNormal));
-	cudaCheck(cudaFree(cudaLocalPos));	
+	cudaCheck(cudaFree(cudaLocalPos));
+	cudaCheck(cudaFree(cudaViewMat));
 }
 
 }
