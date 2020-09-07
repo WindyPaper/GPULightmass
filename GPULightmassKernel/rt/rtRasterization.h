@@ -125,11 +125,11 @@ __device__ void interplate_triangle_buffer(const int w, const int h, const int2 
 				float3 out_interplate_normal = interplate_float3(local_normal0, local_normal1, local_normal2, make_float3(w0, w1, w2));
 
 				//get output index
-				int index_out_texel = (i - RasBBox[0].y) * w + (j - RasBBox[0].x);
+				int index_out_texel = (i - RasBBox[0].z) * w + (j - RasBBox[0].x);
 				surfel_data[index_out_texel].pos = make_float4(out_interplate_pos, 1.0f);
 				surfel_data[index_out_texel].normal = make_float4(out_interplate_normal);
 
-				printf("write pixel (%d, %d)\n", j, i);
+				printf("write pixel (%d, %d), data index %d\n", j, i, index_out_texel);
 			}
 			else
 			{
