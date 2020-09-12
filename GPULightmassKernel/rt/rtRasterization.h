@@ -1,5 +1,41 @@
 #pragma once
 
+//Calculate the signed area of a given triangle.
+__device__ float calculateSignedArea(const float3 tri[3])
+{
+	return 0.5 * ((tri[2].x - tri[0].x) * (tri[1].y - tri[0].y) - (tri[1].x - tri[0].x) * (tri[2].y - tri[0].y));
+}
+
+//Calculate the signed area of a given triangle.
+__device__ float calculateSignedArea(const float2& a, const float2& b, const float2& c)
+{
+	return 0.5 * ((c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x));
+}
+
+//Helper function for calculating barycentric coordinates.
+__device__ float calculateBarycentricCoordinateValue(const float2& a, const float2& b, const float2& c, const float3 tri[3]) {
+	float3 baryTri[3];
+	baryTri[0] = make_float3(a, 0);
+	baryTri[1] = make_float3(b, 0);
+	baryTri[2] = make_float3(c, 0);
+	return calculateSignedArea(baryTri) / calculateSignedArea(tri);
+}
+
+//Calculate barycentric coordinates.
+__device__ float3 calculateBarycentricCoordinate(const float3 tri[3], const float2& point) {
+	float beta = calculateBarycentricCoordinateValue(make_float2(tri[0].x, tri[0].y), point, make_float2(tri[2].x, tri[2].y), tri);
+	float gamma = calculateBarycentricCoordinateValue(make_float2(tri[0].x, tri[0].y), make_float2(tri[1].x, tri[1].y), point, tri);
+	float alpha = 1.0 - beta - gamma;
+	return make_float3(alpha, beta, gamma);
+}
+
+//Check if a barycentric coordinate is within the boundaries of a triangle.
+__device__ bool isBarycentricCoordInBounds(const float3& barycentricCoord) {
+	return barycentricCoord.x >= 0.0f && barycentricCoord.x <= 1.0f &&
+		barycentricCoord.y >= 0.0f && barycentricCoord.y <= 1.0f &&
+		barycentricCoord.z >= 0.0f && barycentricCoord.z <= 1.0f;
+}
+
 __device__ bool pointInTriangle(float3 A, float3 B, float3 C, float3 P)
 {
 	// Prepare our barycentric variables
