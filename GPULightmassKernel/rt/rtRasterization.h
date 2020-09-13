@@ -1,7 +1,9 @@
 #pragma once
 
+static const bool cull_backface = false;
+
 //Calculate the signed area of a given triangle.
-__device__ float calculateSignedArea(const float3 tri[3])
+__device__ float calculateSignedArea(const float2 tri[3])
 {
 	return 0.5 * ((tri[2].x - tri[0].x) * (tri[1].y - tri[0].y) - (tri[1].x - tri[0].x) * (tri[2].y - tri[0].y));
 }
@@ -13,16 +15,16 @@ __device__ float calculateSignedArea(const float2& a, const float2& b, const flo
 }
 
 //Helper function for calculating barycentric coordinates.
-__device__ float calculateBarycentricCoordinateValue(const float2& a, const float2& b, const float2& c, const float3 tri[3]) {
-	float3 baryTri[3];
-	baryTri[0] = make_float3(a, 0);
-	baryTri[1] = make_float3(b, 0);
-	baryTri[2] = make_float3(c, 0);
+__device__ float calculateBarycentricCoordinateValue(const float2& a, const float2& b, const float2& c, const float2 tri[3]) {
+	float2 baryTri[3];
+	baryTri[0] = a;
+	baryTri[1] = b;
+	baryTri[2] = c;
 	return calculateSignedArea(baryTri) / calculateSignedArea(tri);
 }
 
 //Calculate barycentric coordinates.
-__device__ float3 calculateBarycentricCoordinate(const float3 tri[3], const float2& point) {
+__device__ float3 calculateBarycentricCoordinate(const float2 tri[3], const float2& point) {
 	float beta = calculateBarycentricCoordinateValue(make_float2(tri[0].x, tri[0].y), point, make_float2(tri[2].x, tri[2].y), tri);
 	float gamma = calculateBarycentricCoordinateValue(make_float2(tri[0].x, tri[0].y), make_float2(tri[1].x, tri[1].y), point, tri);
 	float alpha = 1.0 - beta - gamma;
@@ -165,11 +167,45 @@ __device__ void interplate_triangle_buffer(const int w, const int h, const int2 
 				surfel_data[index_out_texel].pos = make_float4(out_interplate_pos, 1.0f);
 				surfel_data[index_out_texel].normal = make_float4(out_interplate_normal);
 
-				printf("write pixel (%d, %d), data index %d\n", j, i, index_out_texel);
+				printf("write pixel (%d, %d), data index %d, normal = %f, %f, %f\n", j, i, index_out_texel, out_interplate_normal.x, out_interplate_normal.y, out_interplate_normal.z);
 			}
 			else
 			{
 				//printf("No pixel (%d, %d)\n", j, i);
+			}
+		}
+	}
+}
+
+__device__ void interplate_triangle_buffer_not_cull(
+	const int w, const int h, const int2& lb, const int2& rt,
+	const float2 tri_p[3],
+	const int index0, const int index1, const int index2, GPULightmass::SurfelData* surfel_data)
+{
+	for (int i = lb.y; i <= rt.y; ++i)
+	{
+		for (int j = lb.x; j <= rt.x; ++j)
+		{
+			float3 baryCoords = calculateBarycentricCoordinate(tri_p, make_float2(j + 0.5f, i + 0.5f));
+			bool isInsideTriangle = isBarycentricCoordInBounds(baryCoords);
+			if (isInsideTriangle)
+			{
+				float3 local_pos0 = RasVertexLocalPos[index0];
+				float3 local_pos1 = RasVertexLocalPos[index1];
+				float3 local_pos2 = RasVertexLocalPos[index2];
+				float3 out_interplate_pos = interplate_float3(local_pos0, local_pos1, local_pos2, baryCoords);
+
+				float3 local_normal0 = RasVertexNormals[index0];
+				float3 local_normal1 = RasVertexNormals[index1];
+				float3 local_normal2 = RasVertexNormals[index2];
+				float3 out_interplate_normal = interplate_float3(local_normal0, local_normal1, local_normal2, baryCoords);
+
+				//get output index
+				int index_out_texel = (i - RasBBox[0].z) * w + (j - RasBBox[0].x);
+				RasXZPlaneBuffer[index_out_texel].pos = make_float4(out_interplate_pos, 1.0f);
+				RasXZPlaneBuffer[index_out_texel].normal = make_float4(out_interplate_normal);
+
+				//printf("write pixel (%d, %d), data index %d\n", j, i, index_out_texel);
 			}
 		}
 	}
@@ -223,7 +259,7 @@ __global__ void PlaneRasterization()
 		float2 p0_on_plane = make_float2(p0.x, p0.z) / RasGridElementSize;
 		float2 p1_on_plane = make_float2(p1.x, p1.z) / RasGridElementSize;
 		float2 p2_on_plane = make_float2(p2.x, p2.z) / RasGridElementSize;
-		
+
 		float4 min_max_value = GetBBox(p0_on_plane, p1_on_plane, p2_on_plane);
 
 		printf("(%f, %f, %f), (%f, %f, %f), (%f, %f, %f), bbox = (%f, %f), (%f, %f)\n\n",
@@ -231,9 +267,25 @@ __global__ void PlaneRasterization()
 
 		int w = RasBBox[1].x - RasBBox[0].x;
 		int h = RasBBox[1].z - RasBBox[0].z;
-		interplate_triangle_buffer(w, h, make_int2(min_max_value.x, min_max_value.y), make_int2(min_max_value.z, min_max_value.w),
-			p0_on_plane, p1_on_plane, p2_on_plane, index_0, index_1, index_2, RasXZPlaneBuffer);
-		//RasYZPlaneBuffer[0].pos = make_float3(100.0f, 100.0f, 100.0f);
+		int2 lb = make_int2(min_max_value.x, min_max_value.y);
+		int2 rt = make_int2(min_max_value.z, min_max_value.w);
+
+		if (cull_backface)
+		{
+			interplate_triangle_buffer(w, h, make_int2(min_max_value.x, min_max_value.y), make_int2(min_max_value.z, min_max_value.w),
+				p0_on_plane, p1_on_plane, p2_on_plane, index_0, index_1, index_2, RasXZPlaneBuffer);
+		}
+		else
+		{
+			float2 on_plane_p[3];
+			on_plane_p[0] = p0_on_plane;
+			on_plane_p[1] = p1_on_plane;
+			on_plane_p[2] = p2_on_plane;
+
+			interplate_triangle_buffer_not_cull(w, h, lb, rt, on_plane_p, index_0, index_1, index_2, RasXZPlaneBuffer);
+		}
+
+		//RasYZPlaneBuffer[0].pos = make_float3(100.0f, 100.0f, 100.0f);		
 	}
 }
 
