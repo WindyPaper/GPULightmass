@@ -78,6 +78,8 @@ __device__ GPULightmass::SurfelData* RasYZPlaneBuffer;
 __device__ GPULightmass::SurfelData* RasXZPlaneBuffer;
 __device__ GPULightmass::SurfelData* RasXYPlaneBuffer;
 
+__device__ GPULightmass::LinkListData* RasLinkBuffer;
+
 //__constant__ float4** GatheringRadiosityBuffers;
 //__constant__ float4** ShootingRadiosityBuffers;
 //__constant__ cudaTextureObject_t* ShootingRadiosityTextures;

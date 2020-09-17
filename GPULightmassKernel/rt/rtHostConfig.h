@@ -481,6 +481,13 @@ __host__ void cudaGenerateSignedDistanceFieldVolumeData(Vec3f BoundingBoxMin, Ve
 	cudaDeviceSynchronize();
 }
 
+__host__ void rtBindSurfelLinkData(
+	const GPULightmass::LinkListData* LinkBuffer
+)
+{
+
+}
+
 __host__ void rtBindRasterizeData(
 	const float3 *VertexData,
 	const float3 *VertexNormal,

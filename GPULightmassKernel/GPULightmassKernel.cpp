@@ -524,14 +524,7 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, co
 		std::ceil(camera_base_max_box.x / GridElementSize),
 		std::ceil(camera_base_max_box.y / GridElementSize),
 		std::ceil(camera_base_max_box.z / GridElementSize));
-	/*maxBBox[0] = make_float3(
-		std::floor(BBox[0].x / GridElementSize),
-		std::floor(BBox[0].y / GridElementSize),
-		std::floor(BBox[0].z / GridElementSize));
-	maxBBox[1] = make_float3(
-		std::ceil(BBox[1].x / GridElementSize),
-		std::ceil(BBox[1].y / GridElementSize),
-		std::ceil(BBox[1].z / GridElementSize));*/
+
 	
 	cudaCheck(cudaMemcpy(cudaLocalPos, VertexLocalPositionBuffer, NumVertices * sizeof(float3), cudaMemcpyHostToDevice));
 	cudaCheck(cudaMemcpy(cudaNormal, VertexLocalNormalBuffer, NumVertices * sizeof(float3), cudaMemcpyHostToDevice));
@@ -540,21 +533,29 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, co
 	cudaCheck(cudaMemcpy(cudaBBox, maxBBox, 2 * sizeof(float3), cudaMemcpyHostToDevice));
 
 	//buffer
-	GPULightmass::SurfelData *cudaYZPlaneBuffer; //test
-	int YZNumBufferSize = ((int)maxBBox[1].y - (int)maxBBox[0].y) * ((int)maxBBox[1].z - (int)maxBBox[0].z);
-	cudaCheck(cudaMalloc((void**)&cudaYZPlaneBuffer, YZNumBufferSize * sizeof(GPULightmass::SurfelData)));
-	cudaCheck(cudaMemset(cudaYZPlaneBuffer, 0, YZNumBufferSize * sizeof(GPULightmass::SurfelData)));
+	//GPULightmass::SurfelData *cudaYZPlaneBuffer; //test
+	//int YZNumBufferSize = ((int)maxBBox[1].y - (int)maxBBox[0].y) * ((int)maxBBox[1].z - (int)maxBBox[0].z);
+	//cudaCheck(cudaMalloc((void**)&cudaYZPlaneBuffer, YZNumBufferSize * sizeof(GPULightmass::SurfelData)));
+	//cudaCheck(cudaMemset(cudaYZPlaneBuffer, 0, YZNumBufferSize * sizeof(GPULightmass::SurfelData)));
 
 	GPULightmass::SurfelData* cudaXZPlaneBuffer; // map to camera
 	int XZNumBufferSize = ((int)maxBBox[1].x - (int)maxBBox[0].x) * ((int)maxBBox[1].z - (int)maxBBox[0].z);
 	cudaCheck(cudaMalloc(&cudaXZPlaneBuffer, XZNumBufferSize * sizeof(GPULightmass::SurfelData)));
 	cudaCheck(cudaMemset(cudaXZPlaneBuffer, 0, XZNumBufferSize * sizeof(GPULightmass::SurfelData)));
 
-	GPULightmass::SurfelData* cudaXYPlaneBuffer;
+	int LinkBufferSize = XZNumBufferSize * ((int)maxBBox[1].y - (int)maxBBox[0].y);
+	GPULightmass::LinkListData* pLinkBuffer = new LinkListData[LinkBufferSize];
+	int* pHeadIndexBuffer = new int[XZNumBufferSize];
+
+	GPULightmass::LinkListData* cudaLinkBuffer;
+	cudaCheck(cudaMalloc(&cudaLinkBuffer, sizeof(GPULightmass::LinkListData) * LinkBufferSize));
+	cudaCheck(cudaMemcpy(cudaLinkBuffer, pLinkBuffer, sizeof(GPULightmass::LinkListData) * LinkBufferSize, cudaMemcpyHostToDevice));
+
+	/*GPULightmass::SurfelData* cudaXYPlaneBuffer;
 	int XYNumBufferSize = ((int)maxBBox[1].x - (int)maxBBox[0].x) * ((int)maxBBox[1].y - (int)maxBBox[0].y);
 	cudaCheck(cudaMalloc(&cudaXYPlaneBuffer, XYNumBufferSize * sizeof(GPULightmass::SurfelData)));
 	cudaCheck(cudaMemset(cudaXYPlaneBuffer, 0, XYNumBufferSize * sizeof(GPULightmass::SurfelData)));
-	rtBindRasterizeBufferData(cudaYZPlaneBuffer, cudaXZPlaneBuffer, cudaXYPlaneBuffer);
+	rtBindRasterizeBufferData(cudaYZPlaneBuffer, cudaXZPlaneBuffer, cudaXYPlaneBuffer);*/
 	
 	Mat4f* cudaViewMat;
 	cudaCheck(cudaMalloc(&cudaViewMat, sizeof(Mat4f)));
@@ -568,9 +569,13 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, co
 	OutNumberSurfel[0] = XZNumBufferSize;	
 
 	//release buffer
-	cudaCheck(cudaFree(cudaXYPlaneBuffer));
+	//cudaCheck(cudaFree(cudaXYPlaneBuffer));
 	cudaCheck(cudaFree(cudaXZPlaneBuffer));
-	cudaCheck(cudaFree(cudaYZPlaneBuffer));
+	//cudaCheck(cudaFree(cudaYZPlaneBuffer));
+
+	delete[] pLinkBuffer;
+	delete[] pHeadIndexBuffer;
+	cudaCheck(cudaFree(cudaLinkBuffer));
 
 	cudaCheck(cudaFree(cudaUVs));
 	cudaCheck(cudaFree(cudaTriangleIndex));
