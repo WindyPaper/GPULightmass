@@ -482,10 +482,14 @@ __host__ void cudaGenerateSignedDistanceFieldVolumeData(Vec3f BoundingBoxMin, Ve
 }
 
 __host__ void rtBindSurfelLinkData(
-	const GPULightmass::LinkListData* LinkBuffer
+	const int MaxLinkNodeCount,
+	const GPULightmass::LinkListData* LinkBuffer,
+	const int* LastNodeIdxBuffer
 )
 {
-
+	cudaCheck(cudaMemcpyToSymbol(RasMaxLinkNodeCount, &MaxLinkNodeCount, sizeof(MaxLinkNodeCount)));
+	cudaCheck(cudaMemcpyToSymbol(RasLinkBuffer, &LinkBuffer, sizeof(LinkBuffer)));
+	cudaCheck(cudaMemcpyToSymbol(RasLastIdxNodeBuffer, &LastNodeIdxBuffer, sizeof(LastNodeIdxBuffer)));
 }
 
 __host__ void rtBindRasterizeData(

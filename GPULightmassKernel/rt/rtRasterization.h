@@ -211,6 +211,51 @@ __device__ void interplate_triangle_buffer_not_cull(
 	}
 }
 
+__device__ void interplate_triangle_buffer_not_cull_in_buf_list(
+	const int w, const int h, const int2& lb, const int2& rt,
+	const float2 tri_p[3],
+	const int index0, const int index1, const int index2, GPULightmass::SurfelData* surfel_data)
+{
+	for (int i = lb.y; i <= rt.y; ++i)
+	{
+		for (int j = lb.x; j <= rt.x; ++j)
+		{
+			float3 baryCoords = calculateBarycentricCoordinate(tri_p, make_float2(j + 0.5f, i + 0.5f));
+			bool isInsideTriangle = isBarycentricCoordInBounds(baryCoords);
+			if (isInsideTriangle)
+			{
+				float3 local_pos0 = RasVertexLocalPos[index0];
+				float3 local_pos1 = RasVertexLocalPos[index1];
+				float3 local_pos2 = RasVertexLocalPos[index2];
+				float3 out_interplate_pos = interplate_float3(local_pos0, local_pos1, local_pos2, baryCoords);
+
+				float3 local_normal0 = RasVertexNormals[index0];
+				float3 local_normal1 = RasVertexNormals[index1];
+				float3 local_normal2 = RasVertexNormals[index2];
+				float3 out_interplate_normal = interplate_float3(local_normal0, local_normal1, local_normal2, baryCoords);
+
+				//get output index
+				int index_out_texel = (i - RasBBox[0].z) * w + (j - RasBBox[0].x);
+				//RasXZPlaneBuffer[index_out_texel].pos = make_float4(out_interplate_pos, 1.0f);
+				//RasXZPlaneBuffer[index_out_texel].normal = make_float4(out_interplate_normal);
+
+				//atomicInc(&RasLastIdxNodeBuffer[index_out_texel], -1)
+				atomicInc(&RasCurrLinkCount, RasMaxLinkNodeCount);		
+				RasLinkBuffer[RasCurrLinkCount].data.uvw = make_float2(baryCoords.x, baryCoords.y);
+
+				if (atomicCAS(&RasLastIdxNodeBuffer[index_out_texel], -1, RasCurrLinkCount) == -1) //empty
+				{
+
+				}
+				else
+				{
+
+				}
+			}
+		}
+	}
+}
+
 __device__ void transform_vertex(const Mat4f& m, float3& p)
 {
 	const Vec4f p4f = Vec4f(p.x, p.y, p.z, 1.0f);
