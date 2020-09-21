@@ -84,6 +84,12 @@ __host__ void rtSetGlobalSamplingParameters(
 
 __host__ void rtRasterizeModel(const int NumVertices, const int NumTriangles);
 
+__host__ void rtBindSurfelLinkData(
+	const int MaxLinkNodeCount,
+	const GPULightmass::LinkListData* LinkBuffer,
+	const int* LastNodeIdxBuffer
+);
+
 void WriteHDR(std::string fileName, const float4* buffer, int Width, int Height);
 
 #include "StringUtils.h"
@@ -545,11 +551,21 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, co
 
 	int LinkBufferSize = XZNumBufferSize * ((int)maxBBox[1].y - (int)maxBBox[0].y);
 	GPULightmass::LinkListData* pLinkBuffer = new LinkListData[LinkBufferSize];
-	int* pHeadIndexBuffer = new int[XZNumBufferSize];
+
+	//init
+	int* pLastIdxBuffer = new int[XZNumBufferSize];
+	for (int i = 0; i < XZNumBufferSize; ++i)
+	{
+		pLastIdxBuffer[i] = -1;
+	}
 
 	GPULightmass::LinkListData* cudaLinkBuffer;
+	int *cudaLastIdxBuffer;
 	cudaCheck(cudaMalloc(&cudaLinkBuffer, sizeof(GPULightmass::LinkListData) * LinkBufferSize));
+	cudaCheck(cudaMalloc(&cudaLastIdxBuffer, sizeof(int) * XZNumBufferSize));
 	cudaCheck(cudaMemcpy(cudaLinkBuffer, pLinkBuffer, sizeof(GPULightmass::LinkListData) * LinkBufferSize, cudaMemcpyHostToDevice));
+	cudaCheck(cudaMemcpy(cudaLastIdxBuffer, pLastIdxBuffer, sizeof(int) * XZNumBufferSize, cudaMemcpyHostToDevice));
+	rtBindSurfelLinkData(LinkBufferSize, cudaLinkBuffer, cudaLastIdxBuffer);
 
 	/*GPULightmass::SurfelData* cudaXYPlaneBuffer;
 	int XYNumBufferSize = ((int)maxBBox[1].x - (int)maxBBox[0].x) * ((int)maxBBox[1].y - (int)maxBBox[0].y);
@@ -574,8 +590,9 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, co
 	//cudaCheck(cudaFree(cudaYZPlaneBuffer));
 
 	delete[] pLinkBuffer;
-	delete[] pHeadIndexBuffer;
+	delete[] pLastIdxBuffer;
 	cudaCheck(cudaFree(cudaLinkBuffer));
+	cudaCheck(cudaFree(cudaLastIdxBuffer));
 
 	cudaCheck(cudaFree(cudaUVs));
 	cudaCheck(cudaFree(cudaTriangleIndex));
