@@ -1,6 +1,7 @@
 #pragma once
 
 static const bool cull_backface = false;
+static const bool link_list = true;
 
 //Calculate the signed area of a given triangle.
 __device__ float calculateSignedArea(const float2 tri[3])
@@ -212,9 +213,10 @@ __device__ void interplate_triangle_buffer_not_cull(
 }
 
 __device__ void interplate_triangle_buffer_not_cull_in_buf_list(
+	const int triangle_index,
 	const int w, const int h, const int2& lb, const int2& rt,
 	const float2 tri_p[3],
-	const int index0, const int index1, const int index2, GPULightmass::SurfelData* surfel_data)
+	const int index0, const int index1, const int index2)
 {
 	for (int i = lb.y; i <= rt.y; ++i)
 	{
@@ -240,17 +242,26 @@ __device__ void interplate_triangle_buffer_not_cull_in_buf_list(
 				//RasXZPlaneBuffer[index_out_texel].normal = make_float4(out_interplate_normal);
 
 				//atomicInc(&RasLastIdxNodeBuffer[index_out_texel], -1)
-				atomicInc(&RasCurrLinkCount, RasMaxLinkNodeCount);		
+				if (RasCurrLinkCount > RasMaxLinkNodeCount - 1)
+				{
+					return; //over flow
+				}
+
+				atomicAdd(&RasCurrLinkCount, 1);
 				RasLinkBuffer[RasCurrLinkCount].data.uvw = make_float2(baryCoords.x, baryCoords.y);
+				RasLinkBuffer[RasCurrLinkCount].data.triangle_index = triangle_index;
 
-				if (atomicCAS(&RasLastIdxNodeBuffer[index_out_texel], -1, RasCurrLinkCount) == -1) //empty
-				{
+				//if (atomicCAS(&RasLastIdxNodeBuffer[index_out_texel], -1, RasCurrLinkCount) == -1) //empty
+				//{
 
-				}
-				else
-				{
+				//}
+				//else
+				//{
+				//	RasLinkBuffer[RasCurrLinkCount].prev_index = RasLastIdxNodeBuffer[index_out_texel];
 
-				}
+				//}
+				int old_index = atomicExch(&RasLastIdxNodeBuffer[index_out_texel], RasCurrLinkCount);
+				RasLinkBuffer[RasCurrLinkCount].prev_index = old_index;
 			}
 		}
 	}
@@ -327,7 +338,13 @@ __global__ void PlaneRasterization()
 			on_plane_p[1] = p1_on_plane;
 			on_plane_p[2] = p2_on_plane;
 
-			interplate_triangle_buffer_not_cull(w, h, lb, rt, on_plane_p, index_0, index_1, index_2, RasXZPlaneBuffer);
+			if (link_list)
+			{
+				interplate_triangle_buffer_not_cull_in_buf_list(triangle_index, w, h, lb, rt, on_plane_p, index_0, index_1, index_2);
+			}
+			{
+				interplate_triangle_buffer_not_cull(w, h, lb, rt, on_plane_p, index_0, index_1, index_2, RasXZPlaneBuffer);
+			}
 		}
 
 		//RasYZPlaneBuffer[0].pos = make_float3(100.0f, 100.0f, 100.0f);		

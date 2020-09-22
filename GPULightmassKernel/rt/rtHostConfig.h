@@ -490,6 +490,9 @@ __host__ void rtBindSurfelLinkData(
 	cudaCheck(cudaMemcpyToSymbol(RasMaxLinkNodeCount, &MaxLinkNodeCount, sizeof(MaxLinkNodeCount)));
 	cudaCheck(cudaMemcpyToSymbol(RasLinkBuffer, &LinkBuffer, sizeof(LinkBuffer)));
 	cudaCheck(cudaMemcpyToSymbol(RasLastIdxNodeBuffer, &LastNodeIdxBuffer, sizeof(LastNodeIdxBuffer)));
+
+	const int InitCurrIndex = -1;
+	cudaCheck(cudaMemcpyToSymbol(RasCurrLinkCount, &InitCurrIndex, sizeof(InitCurrIndex)));
 }
 
 __host__ void rtBindRasterizeData(
