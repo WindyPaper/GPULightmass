@@ -247,9 +247,10 @@ __device__ void interplate_triangle_buffer_not_cull_in_buf_list(
 					return; //over flow
 				}
 
-				atomicAdd(&RasCurrLinkCount, 1);
-				RasLinkBuffer[RasCurrLinkCount].data.uvw = make_float2(baryCoords.x, baryCoords.y);
-				RasLinkBuffer[RasCurrLinkCount].data.triangle_index = triangle_index;
+				int local_curr_link_count = atomicAdd(&RasCurrLinkCount, 1);
+				RasLinkBuffer[local_curr_link_count].data.uvw = make_float2(baryCoords.x, baryCoords.y);
+				RasLinkBuffer[local_curr_link_count].data.triangle_index = triangle_index;
+				printf("triangle index = %d\n", triangle_index);
 
 				//if (atomicCAS(&RasLastIdxNodeBuffer[index_out_texel], -1, RasCurrLinkCount) == -1) //empty
 				//{
@@ -260,8 +261,8 @@ __device__ void interplate_triangle_buffer_not_cull_in_buf_list(
 				//	RasLinkBuffer[RasCurrLinkCount].prev_index = RasLastIdxNodeBuffer[index_out_texel];
 
 				//}
-				int old_index = atomicExch(&RasLastIdxNodeBuffer[index_out_texel], RasCurrLinkCount);
-				RasLinkBuffer[RasCurrLinkCount].prev_index = old_index;
+				int old_index = atomicExch(&RasLastIdxNodeBuffer[index_out_texel], local_curr_link_count);
+				RasLinkBuffer[local_curr_link_count].prev_index = old_index;
 			}
 		}
 	}
@@ -318,8 +319,8 @@ __global__ void PlaneRasterization()
 
 		float4 min_max_value = GetBBox(p0_on_plane, p1_on_plane, p2_on_plane);
 
-		printf("(%f, %f, %f), (%f, %f, %f), (%f, %f, %f), bbox = (%f, %f), (%f, %f)\n\n",
-			p0.x, p0.y, p0.z, p1.x, p1.y, p1.z, p2.x, p2.y, p2.z, min_max_value.x, min_max_value.y, min_max_value.z, min_max_value.w);
+		/*printf("(%f, %f, %f), (%f, %f, %f), (%f, %f, %f), bbox = (%f, %f), (%f, %f)\n\n",
+			p0.x, p0.y, p0.z, p1.x, p1.y, p1.z, p2.x, p2.y, p2.z, min_max_value.x, min_max_value.y, min_max_value.z, min_max_value.w);*/
 
 		int w = RasBBox[1].x - RasBBox[0].x;
 		int h = RasBBox[1].z - RasBBox[0].z;
@@ -338,13 +339,14 @@ __global__ void PlaneRasterization()
 			on_plane_p[1] = p1_on_plane;
 			on_plane_p[2] = p2_on_plane;
 
-			if (link_list)
+			/*if (link_list)
 			{
 				interplate_triangle_buffer_not_cull_in_buf_list(triangle_index, w, h, lb, rt, on_plane_p, index_0, index_1, index_2);
 			}
 			{
 				interplate_triangle_buffer_not_cull(w, h, lb, rt, on_plane_p, index_0, index_1, index_2, RasXZPlaneBuffer);
-			}
+			}*/
+			interplate_triangle_buffer_not_cull_in_buf_list(triangle_index, w, h, lb, rt, on_plane_p, index_0, index_1, index_2);
 		}
 
 		//RasYZPlaneBuffer[0].pos = make_float3(100.0f, 100.0f, 100.0f);		

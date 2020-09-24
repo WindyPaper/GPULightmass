@@ -488,6 +488,18 @@ GPULIGHTMASSKERNEL_API bool CreateCache(const int NumVertices, const int NumTria
 	return true;
 }
 
+float3 interplate_float3(const float3 &v0, const float3 &v1, const float3 &v2, const float3 &coeff)
+{
+	return make_float3(
+		dot(make_float3(v0.x, v1.x, v2.x), coeff),
+		dot(make_float3(v0.y, v1.y, v2.y), coeff),
+		dot(make_float3(v0.z, v1.z, v2.z), coeff)
+	);
+}
+
+//void add_surfel_data_output(const float3 VertexLocalPositionBuffer[], const float3 VertexLocalNormalBuffer[], const int3 TriangleIndexBuffer[],
+//	const )
+
 GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, const int NumVertices, const int NumTriangles, 
 	const float3 VertexLocalPositionBuffer[], const float3 VertexLocalNormalBuffer[], const float2 VertexTextureUVBuffer[], const int3 TriangleIndexBuffer[], const int TriangleTextureMappingIndex[], const float3 BBox[],
 	int OutNumberSurfel[], GPULightmass::SurfelData *OutSurfelData)
@@ -580,9 +592,47 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, co
 
 	rtRasterizeModel(NumVertices, NumTriangles);
 
+	// 可以组织数据了	
+	cudaCheck(cudaMemcpy(pLastIdxBuffer, cudaLastIdxBuffer, sizeof(int) * XZNumBufferSize, cudaMemcpyDeviceToHost));
+	cudaCheck(cudaMemcpy(pLinkBuffer, cudaLinkBuffer, sizeof(GPULightmass::LinkListData) * LinkBufferSize, cudaMemcpyDeviceToHost));
+	std::vector<GPULightmass::SurfelData> outSurfelDataVec;
+	for (int i = 0; i < XZNumBufferSize; ++i)
+	{
+		int curr_idx = pLastIdxBuffer[i];
+
+		while(curr_idx != -1)
+		{
+			const GPULightmass::LinkListData &link_surf_data = pLinkBuffer[curr_idx];
+
+			const SurfelLinkData &compress_link_data = link_surf_data.data;
+			const float3 coeffi = make_float3(compress_link_data.uvw, 1.0f - compress_link_data.uvw.x - compress_link_data.uvw.y);
+
+			int3 idxs = TriangleIndexBuffer[compress_link_data.triangle_index];
+			float3 local_pos0 = VertexLocalPositionBuffer[idxs.x];
+			float3 local_pos1 = VertexLocalPositionBuffer[idxs.y];
+			float3 local_pos2 = VertexLocalPositionBuffer[idxs.z];
+			float3 out_interplate_pos = interplate_float3(local_pos0, local_pos1, local_pos2, coeffi);
+
+			float3 local_normal0 = VertexLocalNormalBuffer[idxs.x];
+			float3 local_normal1 = VertexLocalNormalBuffer[idxs.y];
+			float3 local_normal2 = VertexLocalNormalBuffer[idxs.z];
+			float3 out_interplate_normal = interplate_float3(local_normal0, local_normal1, local_normal2, coeffi);
+
+			GPULightmass::SurfelData out_surfel_data;
+			out_surfel_data.pos = make_float4(out_interplate_pos, 1.0f);
+			out_surfel_data.normal = make_float4(out_interplate_normal, 1.0f);
+			outSurfelDataVec.push_back(out_surfel_data);
+
+			curr_idx = link_surf_data.prev_index;
+		}
+	}
+
+
 	//copy mem to host
-	cudaCheck(cudaMemcpy(OutSurfelData, cudaXZPlaneBuffer, XZNumBufferSize * sizeof(GPULightmass::SurfelData), cudaMemcpyDeviceToHost));
-	OutNumberSurfel[0] = XZNumBufferSize;	
+	//cudaCheck(cudaMemcpy(OutSurfelData, cudaXZPlaneBuffer, XZNumBufferSize * sizeof(GPULightmass::SurfelData), cudaMemcpyDeviceToHost));
+	int output_surfel_data_count = outSurfelDataVec.size();
+	memcpy(OutSurfelData, &outSurfelDataVec[0], sizeof(GPULightmass::SurfelData) * output_surfel_data_count);
+	OutNumberSurfel[0] = output_surfel_data_count;
 
 	//release buffer
 	//cudaCheck(cudaFree(cudaXYPlaneBuffer));
