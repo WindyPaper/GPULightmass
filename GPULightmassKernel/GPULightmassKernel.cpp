@@ -576,7 +576,7 @@ void GenerateSurfelDirectional(const Mat4f &CamMat, const int GridElementSize, c
 	cudaCheck(cudaMemcpy(cudaBBox, maxBBox, 2 * sizeof(float3), cudaMemcpyHostToDevice));	
 
 	GPULightmass::SurfelData* cudaXZPlaneBuffer; // map to camera
-	int XZNumBufferSize = ((int)maxBBox[1].x - (int)maxBBox[0].x) * ((int)maxBBox[1].z - (int)maxBBox[0].z);
+	int XZNumBufferSize = (int(maxBBox[1].x) - int(maxBBox[0].x)) * (int(maxBBox[1].z) - int(maxBBox[0].z));
 	cudaCheck(cudaMalloc(&cudaXZPlaneBuffer, XZNumBufferSize * sizeof(GPULightmass::SurfelData)));
 	cudaCheck(cudaMemset(cudaXZPlaneBuffer, 0, XZNumBufferSize * sizeof(GPULightmass::SurfelData)));
 
@@ -727,22 +727,23 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, co
 	int before_num = UpCameraCount + LeftCameraCount + ForwardCameraCount;
 	OutNumberSurfel[0] = compress_data_hash.size();
 
-	//GPULightmass::SurfelData *pCurr = OutSurfelData;
-	int SurfelDataElemSize = sizeof(GPULightmass::SurfelData);
+	/*int SurfelDataElemSize = sizeof(GPULightmass::SurfelData);
 	int SurfelIdx = 0;
 	for (compress_data_hash_iter = compress_data_hash.begin(); compress_data_hash_iter != compress_data_hash.end(); ++compress_data_hash_iter)
 	{
 		OutSurfelData[SurfelIdx] = compress_data_hash_iter->second;
 		SurfelIdx++;
-	}
+	}*/
 
-	//GPULightmass::SurfelData *pCurr = OutSurfelData;
-	//int SurfelDataElemSize = sizeof(GPULightmass::SurfelData);
-	/*memcpy(pCurr, pUpCameraRasData, UpCameraCount * SurfelDataElemSize);
+
+	OutNumberSurfel[0] = UpCameraCount + LeftCameraCount + ForwardCameraCount;
+	GPULightmass::SurfelData *pCurr = OutSurfelData;
+	int SurfelDataElemSize = sizeof(GPULightmass::SurfelData);
+	memcpy(pCurr, pUpCameraRasData, UpCameraCount * SurfelDataElemSize);
 	pCurr += UpCameraCount;
 	memcpy(pCurr, pLeftCameraRasData, LeftCameraCount * SurfelDataElemSize);
 	pCurr += LeftCameraCount;
-	memcpy(pCurr, pFCameraRasData, ForwardCameraCount * SurfelDataElemSize);*/
+	memcpy(pCurr, pFCameraRasData, ForwardCameraCount * SurfelDataElemSize);
 
 	delete[] pUpCameraRasData;
 	delete[] pLeftCameraRasData;
