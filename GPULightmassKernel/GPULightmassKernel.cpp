@@ -498,14 +498,12 @@ float3 interplate_float3(const float3 &v0, const float3 &v1, const float3 &v2, c
 }
 
 //void add_surfel_data_output(const float3 VertexLocalPositionBuffer[], const float3 VertexLocalNormalBuffer[], const int3 TriangleIndexBuffer[],
-//	const )
+//	const 
 
-GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, const int NumVertices, const int NumTriangles, 
+void GenerateSurfelDirectional(const Mat4f &CamMat, const int GridElementSize, const int NumVertices, const int NumTriangles,
 	const float3 VertexLocalPositionBuffer[], const float3 VertexLocalNormalBuffer[], const float2 VertexTextureUVBuffer[], const int3 TriangleIndexBuffer[], const int TriangleTextureMappingIndex[], const float3 BBox[],
-	int OutNumberSurfel[], GPULightmass::SurfelData *OutSurfelData)
+	int *OutNumberSurfel, GPULightmass::SurfelData **OutSurfelData)
 {
-	CreateCache(NumVertices, NumTriangles, VertexLocalPositionBuffer, TriangleIndexBuffer, BBox);
-
 	float3 *cudaLocalPos;
 	float3 *cudaNormal;
 	float2 *cudaUVs;
@@ -516,13 +514,11 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, co
 	cudaCheck(cudaMalloc((void**)&cudaUVs, NumVertices * sizeof(float2)));
 	cudaCheck(cudaMalloc((void**)&cudaTriangleIndex, NumTriangles * 3 * sizeof(int)));
 	cudaCheck(cudaMalloc((void**)&cudaBBox, 2 * sizeof(float3)));
-	
-	//bbox to camera and ortho projection to determine plane size
-	Mat4f camera_m;
-	camera_m.cameraMatrix(Vec3f(0.0f, 0.0f, -1.0f), Vec3f(0.0f, 0.0f, 0.0f));
+
+	//bbox to camera and ortho projection to determine plane size	
 	Vec4f camera_base_bbox[2];
-	camera_base_bbox[0] = camera_m * Vec4f(BBox[0].x, BBox[0].y, BBox[0].z, 1.0f);
-	camera_base_bbox[1] = camera_m * Vec4f(BBox[1].x, BBox[1].y, BBox[1].z, 1.0f);
+	camera_base_bbox[0] = CamMat * Vec4f(BBox[0].x, BBox[0].y, BBox[0].z, 1.0f);
+	camera_base_bbox[1] = CamMat * Vec4f(BBox[1].x, BBox[1].y, BBox[1].z, 1.0f);
 	float3 camera_base_max_box = make_float3(
 		std::max(camera_base_bbox[0].x, camera_base_bbox[1].x),
 		std::max(camera_base_bbox[0].y, camera_base_bbox[1].y),
@@ -535,7 +531,7 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, co
 
 	float3 maxBBox[2];
 	maxBBox[0] = make_float3(
-		std::floor(camera_base_min_box.x / GridElementSize), 
+		std::floor(camera_base_min_box.x / GridElementSize),
 		std::floor(camera_base_min_box.y / GridElementSize),
 		std::floor(camera_base_min_box.z / GridElementSize));
 	maxBBox[1] = make_float3(
@@ -543,18 +539,11 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, co
 		std::ceil(camera_base_max_box.y / GridElementSize),
 		std::ceil(camera_base_max_box.z / GridElementSize));
 
-	
 	cudaCheck(cudaMemcpy(cudaLocalPos, VertexLocalPositionBuffer, NumVertices * sizeof(float3), cudaMemcpyHostToDevice));
 	cudaCheck(cudaMemcpy(cudaNormal, VertexLocalNormalBuffer, NumVertices * sizeof(float3), cudaMemcpyHostToDevice));
 	cudaCheck(cudaMemcpy(cudaUVs, VertexTextureUVBuffer, NumVertices * sizeof(float2), cudaMemcpyHostToDevice));
 	cudaCheck(cudaMemcpy(cudaTriangleIndex, TriangleIndexBuffer, NumTriangles * 3 * sizeof(int), cudaMemcpyHostToDevice));
-	cudaCheck(cudaMemcpy(cudaBBox, maxBBox, 2 * sizeof(float3), cudaMemcpyHostToDevice));
-
-	//buffer
-	//GPULightmass::SurfelData *cudaYZPlaneBuffer; //test
-	//int YZNumBufferSize = ((int)maxBBox[1].y - (int)maxBBox[0].y) * ((int)maxBBox[1].z - (int)maxBBox[0].z);
-	//cudaCheck(cudaMalloc((void**)&cudaYZPlaneBuffer, YZNumBufferSize * sizeof(GPULightmass::SurfelData)));
-	//cudaCheck(cudaMemset(cudaYZPlaneBuffer, 0, YZNumBufferSize * sizeof(GPULightmass::SurfelData)));
+	cudaCheck(cudaMemcpy(cudaBBox, maxBBox, 2 * sizeof(float3), cudaMemcpyHostToDevice));	
 
 	GPULightmass::SurfelData* cudaXZPlaneBuffer; // map to camera
 	int XZNumBufferSize = ((int)maxBBox[1].x - (int)maxBBox[0].x) * ((int)maxBBox[1].z - (int)maxBBox[0].z);
@@ -579,15 +568,9 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, co
 	cudaCheck(cudaMemcpy(cudaLastIdxBuffer, pLastIdxBuffer, sizeof(int) * XZNumBufferSize, cudaMemcpyHostToDevice));
 	rtBindSurfelLinkData(LinkBufferSize, cudaLinkBuffer, cudaLastIdxBuffer);
 
-	/*GPULightmass::SurfelData* cudaXYPlaneBuffer;
-	int XYNumBufferSize = ((int)maxBBox[1].x - (int)maxBBox[0].x) * ((int)maxBBox[1].y - (int)maxBBox[0].y);
-	cudaCheck(cudaMalloc(&cudaXYPlaneBuffer, XYNumBufferSize * sizeof(GPULightmass::SurfelData)));
-	cudaCheck(cudaMemset(cudaXYPlaneBuffer, 0, XYNumBufferSize * sizeof(GPULightmass::SurfelData)));
-	rtBindRasterizeBufferData(cudaYZPlaneBuffer, cudaXZPlaneBuffer, cudaXYPlaneBuffer);*/
-	
 	Mat4f* cudaViewMat;
 	cudaCheck(cudaMalloc(&cudaViewMat, sizeof(Mat4f)));
-	cudaCheck(cudaMemcpy(cudaViewMat, &camera_m, sizeof(Mat4f), cudaMemcpyHostToDevice));
+	cudaCheck(cudaMemcpy(cudaViewMat, &CamMat, sizeof(Mat4f), cudaMemcpyHostToDevice));
 	rtBindRasterizeData(cudaLocalPos, cudaNormal, cudaUVs, cudaTriangleIndex, cudaBBox, NumVertices, NumTriangles, GridElementSize, cudaViewMat);
 
 	rtRasterizeModel(NumVertices, NumTriangles);
@@ -600,7 +583,7 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, co
 	{
 		int curr_idx = pLastIdxBuffer[i];
 
-		while(curr_idx != -1)
+		while (curr_idx != -1)
 		{
 			const GPULightmass::LinkListData &link_surf_data = pLinkBuffer[curr_idx];
 
@@ -629,10 +612,10 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, co
 
 
 	//copy mem to host
-	//cudaCheck(cudaMemcpy(OutSurfelData, cudaXZPlaneBuffer, XZNumBufferSize * sizeof(GPULightmass::SurfelData), cudaMemcpyDeviceToHost));
 	int output_surfel_data_count = outSurfelDataVec.size();
-	memcpy(OutSurfelData, &outSurfelDataVec[0], sizeof(GPULightmass::SurfelData) * output_surfel_data_count);
-	OutNumberSurfel[0] = output_surfel_data_count;
+	(*OutSurfelData) = new GPULightmass::SurfelData[output_surfel_data_count];
+	memcpy(*OutSurfelData, &outSurfelDataVec[0], sizeof(GPULightmass::SurfelData) * output_surfel_data_count);
+	*OutNumberSurfel = output_surfel_data_count;
 
 	//release buffer
 	//cudaCheck(cudaFree(cudaXYPlaneBuffer));
@@ -650,6 +633,52 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, co
 	cudaCheck(cudaFree(cudaNormal));
 	cudaCheck(cudaFree(cudaLocalPos));
 	cudaCheck(cudaFree(cudaViewMat));
+}
+
+GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, const int NumVertices, const int NumTriangles, 
+	const float3 VertexLocalPositionBuffer[], const float3 VertexLocalNormalBuffer[], const float2 VertexTextureUVBuffer[], const int3 TriangleIndexBuffer[], const int TriangleTextureMappingIndex[], const float3 BBox[],
+	int OutNumberSurfel[], GPULightmass::SurfelData *OutSurfelData)
+{
+	CreateCache(NumVertices, NumTriangles, VertexLocalPositionBuffer, TriangleIndexBuffer, BBox);
+
+	
+	Mat4f camera_up_m;
+	camera_up_m.cameraMatrix(Vec3f(0.0f, 0.0f, -1.0f), Vec3f(0.0f, 0.0f, 0.0f));
+	GPULightmass::SurfelData *pUpCameraRasData = NULL;
+	int UpCameraCount = 0;
+	GenerateSurfelDirectional(camera_up_m, GridElementSize, NumVertices, NumTriangles, VertexLocalPositionBuffer, VertexLocalNormalBuffer, VertexTextureUVBuffer,
+		TriangleIndexBuffer, TriangleTextureMappingIndex, BBox, &UpCameraCount, &pUpCameraRasData);
+	
+
+	Mat4f camera_up_l;
+	camera_up_l.cameraMatrix(Vec3f(1.0f, 0.0f, 0.0f), Vec3f(0.0f, 0.0f, 0.0f));
+	GPULightmass::SurfelData *pLeftCameraRasData = NULL;
+	int LeftCameraCount = 0;
+	GenerateSurfelDirectional(camera_up_l, GridElementSize, NumVertices, NumTriangles, VertexLocalPositionBuffer, VertexLocalNormalBuffer, VertexTextureUVBuffer,
+		TriangleIndexBuffer, TriangleTextureMappingIndex, BBox, &LeftCameraCount, &pLeftCameraRasData);
+
+
+	Mat4f camera_up_f;
+	camera_up_f.cameraMatrix(Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 0.0f, 0.0f));
+	GPULightmass::SurfelData *pFCameraRasData = NULL;
+	int ForwardCameraCount = 0;
+	GenerateSurfelDirectional(camera_up_f, GridElementSize, NumVertices, NumTriangles, VertexLocalPositionBuffer, VertexLocalNormalBuffer, VertexTextureUVBuffer,
+		TriangleIndexBuffer, TriangleTextureMappingIndex, BBox, &ForwardCameraCount, &pFCameraRasData);
+
+	OutNumberSurfel[0] = UpCameraCount + LeftCameraCount + ForwardCameraCount;
+
+	GPULightmass::SurfelData *pCurr = OutSurfelData;
+	int SurfelDataElemSize = sizeof(GPULightmass::SurfelData);
+
+	memcpy(pCurr, pUpCameraRasData, UpCameraCount * SurfelDataElemSize);
+	pCurr += UpCameraCount;
+	memcpy(pCurr, pLeftCameraRasData, LeftCameraCount * SurfelDataElemSize);
+	pCurr += LeftCameraCount;
+	memcpy(pCurr, pFCameraRasData, ForwardCameraCount * SurfelDataElemSize);
+
+	delete[] pUpCameraRasData;
+	delete[] pLeftCameraRasData;
+	delete[] pFCameraRasData;
 }
 
 }
