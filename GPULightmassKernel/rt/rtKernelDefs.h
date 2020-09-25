@@ -74,9 +74,7 @@ __device__ int RasNumTriangles;
 __device__ int RasGridElementSize;
 __device__ Mat4f* RasViewMat;
 
-__device__ GPULightmass::SurfelData* RasYZPlaneBuffer;
 __device__ GPULightmass::SurfelData* RasXZPlaneBuffer;
-__device__ GPULightmass::SurfelData* RasXYPlaneBuffer;
 
 __device__ GPULightmass::LinkListData* RasLinkBuffer;
 __device__ int *RasLastIdxNodeBuffer;

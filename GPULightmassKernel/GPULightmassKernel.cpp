@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <time.h>
 #include <fstream>
+#include <unordered_map>
 
 #define GPULIGHTMASSKERNEL_LIB
 
@@ -71,9 +72,7 @@ __host__ void rtBindRasterizeData(
 );
 
 __host__ void rtBindRasterizeBufferData(
-	const GPULightmass::SurfelData* YZPlane,
-	const GPULightmass::SurfelData* XZPlane,
-	const GPULightmass::SurfelData* XYPlane
+	const GPULightmass::SurfelData* XZPlane
 );
 
 __host__ void rtCalculateDirectLighting();
@@ -500,6 +499,37 @@ float3 interplate_float3(const float3 &v0, const float3 &v1, const float3 &v2, c
 //void add_surfel_data_output(const float3 VertexLocalPositionBuffer[], const float3 VertexLocalNormalBuffer[], const int3 TriangleIndexBuffer[],
 //	const 
 
+int F3ToIntKey(const float3 &f)
+{
+	int error_unit = 10;
+
+	int x = f.x * error_unit;
+	int y = f.y * error_unit;
+	int z = f.z * error_unit;
+
+	x = x >= 0 ? 2 * x : (-2 * x - 1);
+	y = y >= 0 ? 2 * y : (-2 * y - 1);
+	z = z >= 0 ? 2 * z : (-2 * z - 1);
+
+	int max_v = max(max(x, y), z);
+	int hash = pow(max_v, 3) + (2 * max_v * z) + z;
+	if (max_v == z)
+	{
+		hash += pow(max(x, y), 2);
+	}
+
+	if (y >= x)
+	{
+		hash += x + y;
+	}
+	else
+	{
+		hash += y;
+	}
+
+	return hash;
+}
+
 void GenerateSurfelDirectional(const Mat4f &CamMat, const int GridElementSize, const int NumVertices, const int NumTriangles,
 	const float3 VertexLocalPositionBuffer[], const float3 VertexLocalNormalBuffer[], const float2 VertexTextureUVBuffer[], const int3 TriangleIndexBuffer[], const int TriangleTextureMappingIndex[], const float3 BBox[],
 	int *OutNumberSurfel, GPULightmass::SurfelData **OutSurfelData)
@@ -579,6 +609,7 @@ void GenerateSurfelDirectional(const Mat4f &CamMat, const int GridElementSize, c
 	cudaCheck(cudaMemcpy(pLastIdxBuffer, cudaLastIdxBuffer, sizeof(int) * XZNumBufferSize, cudaMemcpyDeviceToHost));
 	cudaCheck(cudaMemcpy(pLinkBuffer, cudaLinkBuffer, sizeof(GPULightmass::LinkListData) * LinkBufferSize, cudaMemcpyDeviceToHost));
 	std::vector<GPULightmass::SurfelData> outSurfelDataVec;
+	outSurfelDataVec.reserve(XZNumBufferSize);
 	for (int i = 0; i < XZNumBufferSize; ++i)
 	{
 		int curr_idx = pLastIdxBuffer[i];
@@ -610,17 +641,13 @@ void GenerateSurfelDirectional(const Mat4f &CamMat, const int GridElementSize, c
 		}
 	}
 
-
 	//copy mem to host
 	int output_surfel_data_count = outSurfelDataVec.size();
 	(*OutSurfelData) = new GPULightmass::SurfelData[output_surfel_data_count];
 	memcpy(*OutSurfelData, &outSurfelDataVec[0], sizeof(GPULightmass::SurfelData) * output_surfel_data_count);
 	*OutNumberSurfel = output_surfel_data_count;
 
-	//release buffer
-	//cudaCheck(cudaFree(cudaXYPlaneBuffer));
 	cudaCheck(cudaFree(cudaXZPlaneBuffer));
-	//cudaCheck(cudaFree(cudaYZPlaneBuffer));
 
 	delete[] pLinkBuffer;
 	delete[] pLastIdxBuffer;
@@ -640,6 +667,9 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, co
 	int OutNumberSurfel[], GPULightmass::SurfelData *OutSurfelData)
 {
 	CreateCache(NumVertices, NumTriangles, VertexLocalPositionBuffer, TriangleIndexBuffer, BBox);
+	
+	std::unordered_map<int, GPULightmass::SurfelData> compress_data_hash;
+	std::unordered_map<int, GPULightmass::SurfelData>::iterator compress_data_hash_iter;
 
 	
 	Mat4f camera_up_m;
@@ -649,6 +679,16 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, co
 	GenerateSurfelDirectional(camera_up_m, GridElementSize, NumVertices, NumTriangles, VertexLocalPositionBuffer, VertexLocalNormalBuffer, VertexTextureUVBuffer,
 		TriangleIndexBuffer, TriangleTextureMappingIndex, BBox, &UpCameraCount, &pUpCameraRasData);
 	
+	for (int i = 0; i < UpCameraCount; ++i)
+	{
+		int hash_key = F3ToIntKey(make_float3(pUpCameraRasData[i].pos));
+		compress_data_hash_iter = compress_data_hash.find(hash_key);
+		if (compress_data_hash_iter == compress_data_hash.end())
+		{
+			compress_data_hash.insert(std::pair<int, GPULightmass::SurfelData>(hash_key, pUpCameraRasData[i]));
+		}		
+	}
+	
 
 	Mat4f camera_up_l;
 	camera_up_l.cameraMatrix(Vec3f(1.0f, 0.0f, 0.0f), Vec3f(0.0f, 0.0f, 0.0f));
@@ -657,24 +697,52 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, co
 	GenerateSurfelDirectional(camera_up_l, GridElementSize, NumVertices, NumTriangles, VertexLocalPositionBuffer, VertexLocalNormalBuffer, VertexTextureUVBuffer,
 		TriangleIndexBuffer, TriangleTextureMappingIndex, BBox, &LeftCameraCount, &pLeftCameraRasData);
 
+	for (int i = 0; i < LeftCameraCount; ++i)
+	{
+		int hash_key = F3ToIntKey(make_float3(pLeftCameraRasData[i].pos));
+		compress_data_hash_iter = compress_data_hash.find(hash_key);
+		if (compress_data_hash_iter == compress_data_hash.end())
+		{
+			compress_data_hash.insert(std::pair<int, GPULightmass::SurfelData>(hash_key, pLeftCameraRasData[i]));
+		}
+	}
 
 	Mat4f camera_up_f;
 	camera_up_f.cameraMatrix(Vec3f(0.0f, 1.0f, 0.0f), Vec3f(0.0f, 0.0f, 0.0f));
 	GPULightmass::SurfelData *pFCameraRasData = NULL;
 	int ForwardCameraCount = 0;
 	GenerateSurfelDirectional(camera_up_f, GridElementSize, NumVertices, NumTriangles, VertexLocalPositionBuffer, VertexLocalNormalBuffer, VertexTextureUVBuffer,
-		TriangleIndexBuffer, TriangleTextureMappingIndex, BBox, &ForwardCameraCount, &pFCameraRasData);
+		TriangleIndexBuffer, TriangleTextureMappingIndex, BBox, &ForwardCameraCount, &pFCameraRasData);	
+	
+	for (int i = 0; i < ForwardCameraCount; ++i)
+	{
+		int hash_key = F3ToIntKey(make_float3(pFCameraRasData[i].pos));
+		compress_data_hash_iter = compress_data_hash.find(hash_key);
+		if (compress_data_hash_iter == compress_data_hash.end())
+		{
+			compress_data_hash.insert(std::pair<int, GPULightmass::SurfelData>(hash_key, pFCameraRasData[i]));
+		}
+	}
 
-	OutNumberSurfel[0] = UpCameraCount + LeftCameraCount + ForwardCameraCount;
+	int before_num = UpCameraCount + LeftCameraCount + ForwardCameraCount;
+	OutNumberSurfel[0] = compress_data_hash.size();
 
-	GPULightmass::SurfelData *pCurr = OutSurfelData;
+	//GPULightmass::SurfelData *pCurr = OutSurfelData;
 	int SurfelDataElemSize = sizeof(GPULightmass::SurfelData);
+	int SurfelIdx = 0;
+	for (compress_data_hash_iter = compress_data_hash.begin(); compress_data_hash_iter != compress_data_hash.end(); ++compress_data_hash_iter)
+	{
+		OutSurfelData[SurfelIdx] = compress_data_hash_iter->second;
+		SurfelIdx++;
+	}
 
-	memcpy(pCurr, pUpCameraRasData, UpCameraCount * SurfelDataElemSize);
+	//GPULightmass::SurfelData *pCurr = OutSurfelData;
+	//int SurfelDataElemSize = sizeof(GPULightmass::SurfelData);
+	/*memcpy(pCurr, pUpCameraRasData, UpCameraCount * SurfelDataElemSize);
 	pCurr += UpCameraCount;
 	memcpy(pCurr, pLeftCameraRasData, LeftCameraCount * SurfelDataElemSize);
 	pCurr += LeftCameraCount;
-	memcpy(pCurr, pFCameraRasData, ForwardCameraCount * SurfelDataElemSize);
+	memcpy(pCurr, pFCameraRasData, ForwardCameraCount * SurfelDataElemSize);*/
 
 	delete[] pUpCameraRasData;
 	delete[] pLeftCameraRasData;

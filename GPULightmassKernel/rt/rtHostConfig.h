@@ -521,12 +521,8 @@ __host__ void rtBindRasterizeData(
 }
 
 __host__ void rtBindRasterizeBufferData(
-	const GPULightmass::SurfelData *YZPlane,
-	const GPULightmass::SurfelData *XZPlane,
-	const GPULightmass::SurfelData *XYPlane
+	const GPULightmass::SurfelData *XZPlane
 )
 {
-	cudaCheck(cudaMemcpyToSymbol(RasYZPlaneBuffer, &YZPlane, sizeof(YZPlane)));
 	cudaCheck(cudaMemcpyToSymbol(RasXZPlaneBuffer, &XZPlane, sizeof(XZPlane)));
-	cudaCheck(cudaMemcpyToSymbol(RasXYPlaneBuffer, &XYPlane, sizeof(XYPlane)));
 }
