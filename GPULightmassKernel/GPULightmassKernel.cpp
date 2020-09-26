@@ -17,6 +17,7 @@
 #include "Radiosity.h"
 #include "ProgressReport.h"
 #include "BVH/EmbreeBVHBuilder.h"
+#include "HashCode.h"
 
 //#include "rt/rtDirectLighting.h"
 #include "SurfelData.h"
@@ -499,37 +500,6 @@ float3 interplate_float3(const float3 &v0, const float3 &v1, const float3 &v2, c
 //void add_surfel_data_output(const float3 VertexLocalPositionBuffer[], const float3 VertexLocalNormalBuffer[], const int3 TriangleIndexBuffer[],
 //	const 
 
-int F3ToIntKey(const float3 &f)
-{
-	int error_unit = 10;
-
-	int x = f.x * error_unit;
-	int y = f.y * error_unit;
-	int z = f.z * error_unit;
-
-	x = x >= 0 ? 2 * x : (-2 * x - 1);
-	y = y >= 0 ? 2 * y : (-2 * y - 1);
-	z = z >= 0 ? 2 * z : (-2 * z - 1);
-
-	int max_v = max(max(x, y), z);
-	int hash = pow(max_v, 3) + (2 * max_v * z) + z;
-	if (max_v == z)
-	{
-		hash += pow(max(x, y), 2);
-	}
-
-	if (y >= x)
-	{
-		hash += x + y;
-	}
-	else
-	{
-		hash += y;
-	}
-
-	return hash;
-}
-
 void GenerateSurfelDirectional(const Mat4f &CamMat, const int GridElementSize, const int NumVertices, const int NumTriangles,
 	const float3 VertexLocalPositionBuffer[], const float3 VertexLocalNormalBuffer[], const float2 VertexTextureUVBuffer[], const int3 TriangleIndexBuffer[], const int TriangleTextureMappingIndex[], const float3 BBox[],
 	int *OutNumberSurfel, GPULightmass::SurfelData **OutSurfelData)
@@ -724,26 +694,26 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, co
 		}
 	}
 
-	int before_num = UpCameraCount + LeftCameraCount + ForwardCameraCount;
+	//int before_num = UpCameraCount + LeftCameraCount + ForwardCameraCount;
 	OutNumberSurfel[0] = compress_data_hash.size();
 
-	/*int SurfelDataElemSize = sizeof(GPULightmass::SurfelData);
+	int SurfelDataElemSize = sizeof(GPULightmass::SurfelData);
 	int SurfelIdx = 0;
 	for (compress_data_hash_iter = compress_data_hash.begin(); compress_data_hash_iter != compress_data_hash.end(); ++compress_data_hash_iter)
 	{
 		OutSurfelData[SurfelIdx] = compress_data_hash_iter->second;
 		SurfelIdx++;
-	}*/
+	}
 
 
-	OutNumberSurfel[0] = UpCameraCount + LeftCameraCount + ForwardCameraCount;
+	/*OutNumberSurfel[0] = UpCameraCount + LeftCameraCount + ForwardCameraCount;
 	GPULightmass::SurfelData *pCurr = OutSurfelData;
 	int SurfelDataElemSize = sizeof(GPULightmass::SurfelData);
 	memcpy(pCurr, pUpCameraRasData, UpCameraCount * SurfelDataElemSize);
 	pCurr += UpCameraCount;
 	memcpy(pCurr, pLeftCameraRasData, LeftCameraCount * SurfelDataElemSize);
 	pCurr += LeftCameraCount;
-	memcpy(pCurr, pFCameraRasData, ForwardCameraCount * SurfelDataElemSize);
+	memcpy(pCurr, pFCameraRasData, ForwardCameraCount * SurfelDataElemSize);*/
 
 	delete[] pUpCameraRasData;
 	delete[] pLeftCameraRasData;
