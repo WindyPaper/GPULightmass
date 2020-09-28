@@ -218,4 +218,9 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(
 	SurfelData *OutSurfelData
 );
 
+GPULIGHTMASSKERNEL_API void CalculateSurfelIndirectedLighting(
+	SurfelData *InOutSurfelData,
+	const int SurfelNum
+);
+
 }

@@ -526,3 +526,12 @@ __host__ void rtBindRasterizeBufferData(
 {
 	cudaCheck(cudaMemcpyToSymbol(RasXZPlaneBuffer, &XZPlane, sizeof(XZPlane)));
 }
+
+__host__ void rtBindSurfelIndirectedLightingData(
+	const GPULightmass::SurfelData *SurfelData,
+	const int CalSurfelsNum
+)
+{
+	cudaCheck(cudaMemcpyToSymbol(CalculateIndirectedSurfels, &SurfelData, sizeof(SurfelData)));
+	cudaCheck(cudaMemcpyToSymbol(CalculateSurfelsNum, &CalSurfelsNum, sizeof(CalSurfelsNum)));
+}

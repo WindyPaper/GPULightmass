@@ -90,6 +90,11 @@ __host__ void rtBindSurfelLinkData(
 	const int* LastNodeIdxBuffer
 );
 
+__host__ void rtBindSurfelIndirectedLightingData(
+	const GPULightmass::SurfelData *SurfelData,
+	const int CalSurfelsNum
+);
+
 void WriteHDR(std::string fileName, const float4* buffer, int Width, int Height);
 
 #include "StringUtils.h"
@@ -718,6 +723,15 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, co
 	delete[] pUpCameraRasData;
 	delete[] pLeftCameraRasData;
 	delete[] pFCameraRasData;
+}
+
+GPULIGHTMASSKERNEL_API void CalculateSurfelIndirectedLighting(SurfelData *InOutSurfelData, const int SurfelNum)
+{
+	SurfelData *cudaSurfelData;
+	cudaCheck(cudaMalloc(&cudaSurfelData, SurfelNum * sizeof(SurfelData)));
+	cudaCheck(cudaMemcpy(cudaSurfelData, InOutSurfelData, SurfelNum * sizeof(SurfelData), cudaMemcpyHostToDevice));
+
+	rtBindSurfelIndirectedLightingData(cudaSurfelData, SurfelNum);
 }
 
 }
