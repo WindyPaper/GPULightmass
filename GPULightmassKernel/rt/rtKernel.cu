@@ -118,3 +118,4 @@ __device__ int FinishedRayCount = 0;
 #include "rtHostConfig.h"
 #include "rtDirectLighting.h"
 #include "rtRasterization.h"
+#include "rtLightingSurfel.h"
