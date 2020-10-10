@@ -95,6 +95,8 @@ __host__ void rtBindSurfelIndirectedLightingData(
 	const int CalSurfelsNum
 );
 
+__host__ void rtSurfelDirectLighting(const int SurfelNum);
+
 void WriteHDR(std::string fileName, const float4* buffer, int Width, int Height);
 
 #include "StringUtils.h"
@@ -610,6 +612,7 @@ void GenerateSurfelDirectional(const Mat4f &CamMat, const int GridElementSize, c
 			GPULightmass::SurfelData out_surfel_data;
 			out_surfel_data.pos = make_float4(out_interplate_pos, 1.0f);
 			out_surfel_data.normal = make_float4(out_interplate_normal, 1.0f);
+			out_surfel_data.diff_alpha = make_float4(0.3f, 0.3f, 0.3f, 1.0f);
 			outSurfelDataVec.push_back(out_surfel_data);
 
 			curr_idx = link_surf_data.prev_index;
@@ -710,15 +713,7 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, co
 		SurfelIdx++;
 	}
 
-
-	/*OutNumberSurfel[0] = UpCameraCount + LeftCameraCount + ForwardCameraCount;
-	GPULightmass::SurfelData *pCurr = OutSurfelData;
-	int SurfelDataElemSize = sizeof(GPULightmass::SurfelData);
-	memcpy(pCurr, pUpCameraRasData, UpCameraCount * SurfelDataElemSize);
-	pCurr += UpCameraCount;
-	memcpy(pCurr, pLeftCameraRasData, LeftCameraCount * SurfelDataElemSize);
-	pCurr += LeftCameraCount;
-	memcpy(pCurr, pFCameraRasData, ForwardCameraCount * SurfelDataElemSize);*/
+	CalculateSurfelIndirectedLighting(OutSurfelData, OutNumberSurfel[0]);
 
 	delete[] pUpCameraRasData;
 	delete[] pLeftCameraRasData;
@@ -731,7 +726,18 @@ GPULIGHTMASSKERNEL_API void CalculateSurfelIndirectedLighting(SurfelData *InOutS
 	cudaCheck(cudaMalloc(&cudaSurfelData, SurfelNum * sizeof(SurfelData)));
 	cudaCheck(cudaMemcpy(cudaSurfelData, InOutSurfelData, SurfelNum * sizeof(SurfelData), cudaMemcpyHostToDevice));
 
+	const int PassNum = 5;
+
+	Mat4f dir;
+	dir.cameraMatrix(Vec3f(1.0f, 0.0f, 0.0f), Vec3f(0.0f, 0.0f, 0.0f));
+
 	rtBindSurfelIndirectedLightingData(cudaSurfelData, SurfelNum);
+
+	rtSurfelDirectLighting(SurfelNum);
+
+	cudaCheck(cudaMemcpy(InOutSurfelData, cudaSurfelData, SurfelNum * sizeof(SurfelData), cudaMemcpyDeviceToHost));
+
+	cudaCheck(cudaFree(cudaSurfelData));
 }
 
 }

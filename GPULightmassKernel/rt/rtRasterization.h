@@ -226,7 +226,7 @@ __device__ void interplate_triangle_buffer_not_cull_in_buf_list(
 			bool isInsideTriangle = isBarycentricCoordInBounds(baryCoords);
 			if (isInsideTriangle)
 			{
-				float3 local_pos0 = RasVertexLocalPos[index0];
+				/*float3 local_pos0 = RasVertexLocalPos[index0];
 				float3 local_pos1 = RasVertexLocalPos[index1];
 				float3 local_pos2 = RasVertexLocalPos[index2];
 				float3 out_interplate_pos = interplate_float3(local_pos0, local_pos1, local_pos2, baryCoords);
@@ -234,7 +234,7 @@ __device__ void interplate_triangle_buffer_not_cull_in_buf_list(
 				float3 local_normal0 = RasVertexNormals[index0];
 				float3 local_normal1 = RasVertexNormals[index1];
 				float3 local_normal2 = RasVertexNormals[index2];
-				float3 out_interplate_normal = interplate_float3(local_normal0, local_normal1, local_normal2, baryCoords);
+				float3 out_interplate_normal = interplate_float3(local_normal0, local_normal1, local_normal2, baryCoords);*/
 
 				//get output index
 				int index_out_texel = (i - RasBBox[0].z) * w + (j - RasBBox[0].x);
