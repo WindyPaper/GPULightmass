@@ -28,4 +28,17 @@ namespace GPULightmass
 			prev_index = -1;
 		}
 	};
+
+	//lighting data
+	struct SurfelDirLightingData
+	{
+		int SurfelNum;
+		float4 *radiance[2] = { nullptr, nullptr };
+		int *LinkIndexBuf = nullptr;
+
+		SurfelDirLightingData()
+		{
+			SurfelNum = 0;
+		}
+	};
 }

@@ -85,8 +85,10 @@ __device__ int RasCurrLinkCount = 0;
 //__constant__ float4** ShootingRadiosityBuffers;
 //__constant__ cudaTextureObject_t* ShootingRadiosityTextures;
 
+//__device__ int *SurfelIndrectedLinkListData;
 __device__ GPULightmass::SurfelData* CalculateIndirectedSurfels;
-__device__ int CalculateSurfelsNum;
+//__device__ int CalculateSurfelsNum;
+__device__ GPULightmass::SurfelDirLightingData* SurfelLightingBuffer;
 
 __constant__ int BindedSizeX;
 __constant__ int BindedSizeY;
