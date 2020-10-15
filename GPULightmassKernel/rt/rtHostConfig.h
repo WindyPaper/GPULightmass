@@ -537,10 +537,7 @@ __host__ void rtBindSurfelIndirectedLightingData(
 	//cudaCheck(cudaMemcpyToSymbol(CalculateSurfelsNum, &CalSurfelsNum, sizeof(CalSurfelsNum)));
 	cudaCheck(cudaMemcpyToSymbol(RasGridElementSize, &GridElementSize, sizeof(GridElementSize)));
 
-	cudaCheck(cudaMemcpyToSymbol(RasMaxLinkNodeCount, &CalSurfelsNum, sizeof(CalSurfelsNum)));
-
-	const int InitCurrIndex = 0;
-	cudaCheck(cudaMemcpyToSymbol(RasCurrLinkCount, &InitCurrIndex, sizeof(InitCurrIndex)));
+	cudaCheck(cudaMemcpyToSymbol(RasMaxLinkNodeCount, &CalSurfelsNum, sizeof(CalSurfelsNum)));	
 }
 
 __host__ void rtBindSurfelDirLightData(
@@ -551,10 +548,17 @@ __host__ void rtBindSurfelDirLightData(
 }
 
 __host__ void rtBindSurfelIndirectedLightingDirData(
-	const Mat4f *ViewMat,
-	const float3 *bbox
+	const Mat4f* ViewMat,
+	const float3* bbox,
+	const int* LastLinkData,
+	const int* LinkBufferData
 )
 {
 	cudaCheck(cudaMemcpyToSymbol(RasViewMat, &ViewMat, sizeof(ViewMat)));
 	cudaCheck(cudaMemcpyToSymbol(RasBBox, &bbox, sizeof(bbox)));
+	cudaCheck(cudaMemcpyToSymbol(RasLastIdxNodeBuffer, &LastLinkData, sizeof(LastLinkData)));
+	cudaCheck(cudaMemcpyToSymbol(RasIntLightingLinkBuffer, &LinkBufferData, sizeof(LinkBufferData)));
+
+	const int InitCurrIndex = 0;
+	cudaCheck(cudaMemcpyToSymbol(RasCurrLinkCount, &InitCurrIndex, sizeof(InitCurrIndex)));
 }

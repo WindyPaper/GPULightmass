@@ -80,6 +80,7 @@ __device__ GPULightmass::LinkListData* RasLinkBuffer;
 __device__ int *RasLastIdxNodeBuffer;
 __device__ int RasMaxLinkNodeCount;
 __device__ int RasCurrLinkCount = 0;
+__device__ int *RasIntLightingLinkBuffer;
 
 //__constant__ float4** GatheringRadiosityBuffers;
 //__constant__ float4** ShootingRadiosityBuffers;

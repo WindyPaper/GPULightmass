@@ -34,7 +34,7 @@ namespace GPULightmass
 	{
 		int SurfelNum;
 		float4 *radiance[2] = { nullptr, nullptr };
-		int *LinkIndexBuf = nullptr;
+		//int *LinkIndexBuf = nullptr;
 
 		SurfelDirLightingData()
 		{

@@ -86,7 +86,8 @@ __global__ void CalSurfelIndirectedLighting()
 		int local_curr_link_count = atomicAdd(&RasCurrLinkCount, 1);		
 		
 		int old_index = atomicExch(&RasLastIdxNodeBuffer[surfel_index], local_curr_link_count);
-		SurfelLightingBuffer->LinkIndexBuf[local_curr_link_count] = old_index;
+		RasIntLightingLinkBuffer[local_curr_link_count] = old_index;
+		//printf("%d\n", RasIntLightingLinkBuffer[local_curr_link_count]);
 	}
 }
 

@@ -137,8 +137,8 @@ __device__ void interplate_triangle_buffer(const int w, const int h, const int2 
 	//int w = RasBBox[1].x - RasBBox[0].x;
 	//int h = RasBBox[1].y - RasBBox[0].y;
 
-	printf("(%d, %d) (%d, %d) w = %d, h = %d, (%f, %f), (%f, %f), (%f, %f)\n", 
-		lb.x, lb.y, rt.x, rt.y, w, h, p0.x, p0.y, p1.x, p1.y, p2.x, p2.y);
+	//printf("(%d, %d) (%d, %d) w = %d, h = %d, (%f, %f), (%f, %f), (%f, %f)\n", 
+	//	lb.x, lb.y, rt.x, rt.y, w, h, p0.x, p0.y, p1.x, p1.y, p2.x, p2.y);
 
 	for (int i = lb.y; i <= rt.y; ++i)
 	{
@@ -168,12 +168,12 @@ __device__ void interplate_triangle_buffer(const int w, const int h, const int2 
 				surfel_data[index_out_texel].pos = make_float4(out_interplate_pos, 1.0f);
 				surfel_data[index_out_texel].normal = make_float4(out_interplate_normal);
 
-				printf("write pixel (%d, %d), data index %d, normal = %f, %f, %f\n", j, i, index_out_texel, out_interplate_normal.x, out_interplate_normal.y, out_interplate_normal.z);
+				//printf("write pixel (%d, %d), data index %d, normal = %f, %f, %f\n", j, i, index_out_texel, out_interplate_normal.x, out_interplate_normal.y, out_interplate_normal.z);
 			}
-			else
-			{
+			//else
+			//{
 				//printf("No pixel (%d, %d)\n", j, i);
-			}
+			//}
 		}
 	}
 }
@@ -250,7 +250,7 @@ __device__ void interplate_triangle_buffer_not_cull_in_buf_list(
 				int local_curr_link_count = atomicAdd(&RasCurrLinkCount, 1);
 				RasLinkBuffer[local_curr_link_count].data.uvw = make_float2(baryCoords.x, baryCoords.y);
 				RasLinkBuffer[local_curr_link_count].data.triangle_index = triangle_index;
-				printf("triangle index = %d\n", triangle_index);
+				//printf("triangle index = %d\n", triangle_index);
 
 				//if (atomicCAS(&RasLastIdxNodeBuffer[index_out_texel], -1, RasCurrLinkCount) == -1) //empty
 				//{
