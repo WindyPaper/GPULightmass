@@ -92,6 +92,7 @@ __host__ void rtBindSurfelLinkData(
 
 __host__ void rtBindSurfelIndirectedLightingData(
 	const GPULightmass::SurfelData *SurfelData,
+	const int *SurfelSortLinkBufferData,
 	const int CalSurfelsNum,
 	const int GridElementSize
 );
@@ -106,10 +107,13 @@ __host__ void rtBindSurfelIndirectedLightingDirData(
 	const Mat4f* ViewMat,
 	const float3* bbox,
 	const int* LastLinkData,
-	const int* LinkBufferData
+	const GPULightmass::SurfelRasIntLinkData* LinkBufferData,
+	const int* SortOffsetNumData
 );
 
-__host__ void rtSurfelIndirectedLighting(const int SurfelNum);
+__host__ void rtSurfelMapToPlane(const int SurfelNum);
+
+__host__ void rtSurfelSortAndLighting(const int PlaneSize);
 
 void WriteHDR(std::string fileName, const float4* buffer, int Width, int Height);
 
@@ -755,12 +759,14 @@ GPULIGHTMASSKERNEL_API void CalculateSurfelIndirectedLighting(SurfelData *InOutS
 {
 	SurfelData *cudaSurfelData;
 	cudaCheck(cudaMalloc(&cudaSurfelData, SurfelNum * sizeof(SurfelData)));
-	cudaCheck(cudaMemcpy(cudaSurfelData, InOutSurfelData, SurfelNum * sizeof(SurfelData), cudaMemcpyHostToDevice));	
+	cudaCheck(cudaMemcpy(cudaSurfelData, InOutSurfelData, SurfelNum * sizeof(SurfelData), cudaMemcpyHostToDevice));		
+
+	int *cudaSortLinkBuffer;
+	cudaCheck(cudaMalloc(&cudaSortLinkBuffer, SurfelNum * sizeof(int)));	
+	rtBindSurfelIndirectedLightingData(cudaSurfelData, cudaSortLinkBuffer, SurfelNum, GridElementSize);
 
 	float3 BBox[2];
 	GetBBox(InOutSurfelData, SurfelNum, BBox);
-
-	rtBindSurfelIndirectedLightingData(cudaSurfelData, SurfelNum, GridElementSize);
 
 	//First pass, direct lighting
 	rtSurfelDirectLighting(SurfelNum);
@@ -773,13 +779,14 @@ GPULIGHTMASSKERNEL_API void CalculateSurfelIndirectedLighting(SurfelData *InOutS
 	cudaCheck(cudaMalloc(&SurfelDirLightingBuffer.radiance[1], sizeof(float4) * SurfelNum));
 	cudaCheck(cudaMemset(SurfelDirLightingBuffer.radiance[1], 0, sizeof(float4) * SurfelNum));
 	//cudaCheck(cudaMalloc(&SurfelDirLightingBuffer.LinkIndexBuf, sizeof(int) * SurfelNum));
-	int* pInitLastIdxBuffer = new int[SurfelNum];
+	SurfelRasIntLinkData* pInitLastIdxBuffer = new SurfelRasIntLinkData[SurfelNum];
 	for (int i = 0; i < SurfelNum; ++i)
 	{
-		pInitLastIdxBuffer[i] = -1;
+		pInitLastIdxBuffer[i].PrevIndex = -1;
+		pInitLastIdxBuffer[i].SurfelIndex = -1;
 	}
-	int* cudaLinkBufferData;
-	cudaCheck(cudaMalloc(&cudaLinkBufferData, sizeof(int) * SurfelNum));		
+	SurfelRasIntLinkData* cudaLinkBufferData;
+	cudaCheck(cudaMalloc(&cudaLinkBufferData, sizeof(SurfelRasIntLinkData) * SurfelNum));
 	
 	SurfelDirLightingData *cudaSurfelDirLightingBuffer;
 	cudaCheck(cudaMalloc(&cudaSurfelDirLightingBuffer, sizeof(SurfelDirLightingData)));
@@ -832,7 +839,7 @@ GPULIGHTMASSKERNEL_API void CalculateSurfelIndirectedLighting(SurfelData *InOutS
 			cudaCheck(cudaMemcpy(cudaViewMat, &dir, sizeof(Mat4f), cudaMemcpyHostToDevice));
 			cudaCheck(cudaMemcpy(cudaBBox, BBoxBaseOnCam, sizeof(float3) * 2, cudaMemcpyHostToDevice));
 
-			int XZNumBufferSize = (int(BBoxBaseOnCam[1].x) - int(BBoxBaseOnCam[0].x)) * (int(BBoxBaseOnCam[1].z) - int(BBoxBaseOnCam[0].z));
+			int XZNumBufferSize = int(BBoxBaseOnCam[1].x - BBoxBaseOnCam[0].x) * int(BBoxBaseOnCam[1].z - BBoxBaseOnCam[0].z);
 			int* SurfelLightingLastLink = new int[XZNumBufferSize];
 			for (int nl = 0; nl < XZNumBufferSize; ++nl)
 			{
@@ -842,13 +849,20 @@ GPULIGHTMASSKERNEL_API void CalculateSurfelIndirectedLighting(SurfelData *InOutS
 			cudaCheck(cudaMalloc(&cudaSurfelLightingLastLink, sizeof(int) * XZNumBufferSize));
 			cudaCheck(cudaMemcpy(cudaSurfelLightingLastLink, SurfelLightingLastLink, sizeof(int) * XZNumBufferSize, cudaMemcpyHostToDevice));
 
-			cudaCheck(cudaMemcpy(cudaLinkBufferData, pInitLastIdxBuffer, sizeof(int) * SurfelNum, cudaMemcpyHostToDevice));
+			cudaCheck(cudaMemcpy(cudaLinkBufferData, pInitLastIdxBuffer, sizeof(SurfelRasIntLinkData) * SurfelNum, cudaMemcpyHostToDevice));
 
-			rtBindSurfelIndirectedLightingDirData(cudaViewMat, cudaBBox, cudaSurfelLightingLastLink, cudaLinkBufferData);
+			int* cudaSurfelSortOffsetBuffer;
+			cudaCheck(cudaMalloc(&cudaSurfelSortOffsetBuffer, sizeof(int) * XZNumBufferSize));
 
-			rtSurfelIndirectedLighting(SurfelNum);
+			rtBindSurfelIndirectedLightingDirData(cudaViewMat, cudaBBox, cudaSurfelLightingLastLink, cudaLinkBufferData, cudaSurfelSortOffsetBuffer);
+
+			rtSurfelMapToPlane(SurfelNum);
+
+			//sort and lighting			
+			rtSurfelSortAndLighting(XZNumBufferSize);
 
 			cudaCheck(cudaFree(cudaSurfelLightingLastLink));
+			cudaCheck(cudaFree(cudaSurfelSortOffsetBuffer));
 			delete[] SurfelLightingLastLink;
 		}
 	}
@@ -864,6 +878,7 @@ GPULIGHTMASSKERNEL_API void CalculateSurfelIndirectedLighting(SurfelData *InOutS
 	cudaCheck(cudaFree(cudaLinkBufferData));
 	cudaCheck(cudaFree(cudaViewMat));
 	cudaCheck(cudaFree(cudaBBox));
+	cudaCheck(cudaFree(cudaSortLinkBuffer));
 }
 
 }

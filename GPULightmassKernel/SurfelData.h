@@ -41,4 +41,10 @@ namespace GPULightmass
 			SurfelNum = 0;
 		}
 	};
+
+	struct SurfelRasIntLinkData
+	{
+		int PrevIndex;
+		int SurfelIndex;
+	};
 }

@@ -63,7 +63,7 @@ __host__ void rtSurfelDirectLighting(const int SurfelNum)
 	CalSurfelDirectLighting << <gridDim, blockDim >> > ();
 }
 
-__global__ void CalSurfelIndirectedLighting()
+__global__ void SurfelMapToPlane()
 {
 	int surfel_index = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -75,8 +75,9 @@ __global__ void CalSurfelIndirectedLighting()
 
 		p = p / RasGridElementSize;
 
-		int w = RasBBox[1].x - RasBBox[0].x;
-		int surfel_index = w * int(p.z - RasBBox[0].z) + (p.x - RasBBox[0].x);
+		const int w = (RasBBox[1].x) - (RasBBox[0].x);
+		const int h = (RasBBox[1].z) - (RasBBox[0].z);
+		int surfel_index = min(w * int(p.z - RasBBox[0].z) + int(p.x - RasBBox[0].x), w * h - 1);
 
 		if (RasCurrLinkCount > RasMaxLinkNodeCount)
 		{
@@ -86,15 +87,115 @@ __global__ void CalSurfelIndirectedLighting()
 		int local_curr_link_count = atomicAdd(&RasCurrLinkCount, 1);		
 		
 		int old_index = atomicExch(&RasLastIdxNodeBuffer[surfel_index], local_curr_link_count);
-		RasIntLightingLinkBuffer[local_curr_link_count] = old_index;
-		//printf("%d\n", RasIntLightingLinkBuffer[local_curr_link_count]);
+		/*printf("SurfelMapToPlane surfel_index = %d, old idx = %d, local_curr_link_count = %d, curr value = %d, w * h - 1 = %d\n", 
+			surfel_index, old_index, local_curr_link_count, RasLastIdxNodeBuffer[surfel_index], w * h - 1);*/
+		RasIntLightingLinkBuffer[local_curr_link_count].PrevIndex = old_index;
+		RasIntLightingLinkBuffer[local_curr_link_count].SurfelIndex = surfel_index;	
 	}
 }
 
-__host__ void rtSurfelIndirectedLighting(const int SurfelNum)
+__host__ void rtSurfelMapToPlane(const int SurfelNum)
 {
 	const int Stride = 64;
 	dim3 blockDim(Stride, 1);
 	dim3 gridDim(divideAndRoundup(SurfelNum, Stride), 1);
-	CalSurfelIndirectedLighting << <gridDim, blockDim >> > ();
+	SurfelMapToPlane << <gridDim, blockDim >> > ();
+}
+
+__global__ void GenerateSurfelNumPlane()
+{
+	int BufferIdx = blockIdx.x * blockDim.x + threadIdx.x;
+	const int w = RasBBox[1].x - RasBBox[0].x;
+	const int h = RasBBox[1].z - RasBBox[0].z;
+	const int PlaneBufferSize = w * h;
+
+	if (BufferIdx < PlaneBufferSize)
+	{
+		int head = RasLastIdxNodeBuffer[BufferIdx];
+
+		int next = head;
+		int SurfelNum = 0;
+		while (next != -1)
+		{
+			next = RasIntLightingLinkBuffer[next].PrevIndex;
+			++SurfelNum;
+		}
+
+		RasSurfelSortOffsetNumBuffer[BufferIdx] = SurfelNum;
+	}
+}
+
+__global__ void SortingAndLightingSurfel()
+{
+	int BufferIdx = blockIdx.x * blockDim.x + threadIdx.x;
+	const int w = RasBBox[1].x - RasBBox[0].x;
+	const int h = RasBBox[1].z - RasBBox[0].z;
+	const int PlaneBufferSize = w * h;
+
+	if (BufferIdx < PlaneBufferSize)
+	{		
+		int offset = 0;
+		for (int i = 0; i < BufferIdx; ++i)
+		{
+			offset += RasSurfelSortOffsetNumBuffer[i];
+		}
+
+		//Get elements
+		int head = RasLastIdxNodeBuffer[BufferIdx];
+		int next = head;
+		int idx_count = 0;
+		while (next != -1)
+		{
+			SurfelSortLinkBuffer[offset + idx_count] = RasIntLightingLinkBuffer[next].SurfelIndex;
+
+			next = RasIntLightingLinkBuffer[next].PrevIndex;
+			++idx_count;
+		}
+
+		//Sorting
+		for (int i = 1; i < idx_count; ++i)
+		{
+			for (int j = i; j > 0; --j)
+			{
+				int CurrIndex = SurfelSortLinkBuffer[offset + j];
+				int PrevIndex = SurfelSortLinkBuffer[offset + j - 1];
+
+				if (CalculateIndirectedSurfels[CurrIndex].pos.z < CalculateIndirectedSurfels[PrevIndex].pos.z)
+				{
+					int temp = SurfelSortLinkBuffer[offset + j];
+					SurfelSortLinkBuffer[offset + j] = SurfelSortLinkBuffer[offset + j - 1];
+					SurfelSortLinkBuffer[offset + j - 1] = temp;
+				}
+			}
+		}
+
+		//Lighting
+		for (int i = 0; i < idx_count - 1; ++i)
+		{
+			int FrontSurfelIdx = SurfelSortLinkBuffer[offset + i];
+			int NextSurfelIdx = SurfelSortLinkBuffer[offset + i + 1];
+
+			const GPULightmass::SurfelData &fdata = CalculateIndirectedSurfels[FrontSurfelIdx];
+			const GPULightmass::SurfelData &ndata = CalculateIndirectedSurfels[NextSurfelIdx];
+
+			//Is face to face?
+			float3 f_to_n = normalize(make_float3(ndata.pos) - make_float3(fdata.pos));
+			if (dot(f_to_n, make_float3(fdata.normal)) > 0.0f &&
+				dot(-f_to_n, make_float3(ndata.normal)) > 0.0f)
+			{
+
+			}
+		}
+	}
+}
+
+__host__ void rtSurfelSortAndLighting(const int PlaneSize)
+{
+	const int Stride = 64;
+	dim3 blockDim(Stride, 1);
+	dim3 gridDim(divideAndRoundup(PlaneSize, Stride), 1);
+	
+	GenerateSurfelNumPlane << <gridDim, blockDim >> > ();
+
+	SortingAndLightingSurfel << <gridDim, blockDim >> > ();
 }

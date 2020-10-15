@@ -80,7 +80,7 @@ __device__ GPULightmass::LinkListData* RasLinkBuffer;
 __device__ int *RasLastIdxNodeBuffer;
 __device__ int RasMaxLinkNodeCount;
 __device__ int RasCurrLinkCount = 0;
-__device__ int *RasIntLightingLinkBuffer;
+__device__ GPULightmass::SurfelRasIntLinkData *RasIntLightingLinkBuffer;
 
 //__constant__ float4** GatheringRadiosityBuffers;
 //__constant__ float4** ShootingRadiosityBuffers;
@@ -90,6 +90,8 @@ __device__ int *RasIntLightingLinkBuffer;
 __device__ GPULightmass::SurfelData* CalculateIndirectedSurfels;
 //__device__ int CalculateSurfelsNum;
 __device__ GPULightmass::SurfelDirLightingData* SurfelLightingBuffer;
+__device__ int *RasSurfelSortOffsetNumBuffer;
+__device__ int *SurfelSortLinkBuffer;
 
 __constant__ int BindedSizeX;
 __constant__ int BindedSizeY;
