@@ -32,14 +32,14 @@ namespace GPULightmass
 	//lighting data
 	struct SurfelDirLightingData
 	{
-		int SurfelNum;
+		//int SurfelNum;
 		float4 *radiance[2] = { nullptr, nullptr };
 		//int *LinkIndexBuf = nullptr;
 
-		SurfelDirLightingData()
-		{
-			SurfelNum = 0;
-		}
+		//SurfelDirLightingData()
+		//{
+//			SurfelNum = 0;
+		//}
 	};
 
 	struct SurfelRasIntLinkData

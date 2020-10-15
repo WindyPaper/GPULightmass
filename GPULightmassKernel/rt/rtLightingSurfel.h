@@ -50,6 +50,7 @@ __global__ void CalSurfelDirectLighting()
 				//float3 RayInTangentSpace = WorldToTangent(RayInWorldSpace, tangent1, tangent2, WorldNormal);
 				//OutLightmapData[TargetTexelLocation].PointLightWorldSpace(radiance, RayInTangentSpace, RayInWorldSpace);
 				CalculateIndirectedSurfels[surfel_index].diff_alpha += make_float4(radiance, 0.0f);
+				//CalculateIndirectedSurfels[surfel_index].diff_alpha += make_float4(1.0f);
 			}			
 		}
 	}
@@ -75,11 +76,11 @@ __global__ void SurfelMapToPlane()
 
 		p = p / RasGridElementSize;
 
-		const int w = (RasBBox[1].x) - (RasBBox[0].x);
-		const int h = (RasBBox[1].z) - (RasBBox[0].z);
-		int surfel_index = min(w * int(p.z - RasBBox[0].z) + int(p.x - RasBBox[0].x), w * h - 1);
+		const int w = int(RasBBox[1].x) - int(RasBBox[0].x);
+		const int h = int(RasBBox[1].z) - int(RasBBox[0].z);
+		int surfel_index = max(min(w * int(p.z - RasBBox[0].z) + int(p.x - RasBBox[0].x), w * h - 1), 0); //fixme! should not to be neg num
 
-		if (RasCurrLinkCount > RasMaxLinkNodeCount)
+		if (RasCurrLinkCount > RasMaxLinkNodeCount - 1)
 		{
 			return; //over flow
 		}
@@ -179,11 +180,24 @@ __global__ void SortingAndLightingSurfel()
 			const GPULightmass::SurfelData &ndata = CalculateIndirectedSurfels[NextSurfelIdx];
 
 			//Is face to face?
-			float3 f_to_n = normalize(make_float3(ndata.pos) - make_float3(fdata.pos));
-			if (dot(f_to_n, make_float3(fdata.normal)) > 0.0f &&
-				dot(-f_to_n, make_float3(ndata.normal)) > 0.0f)
+			float3 face_offset = make_float3(ndata.pos) - make_float3(fdata.pos);
+			float3 f_to_n = normalize(face_offset);
+			float ndl_f = max(dot(f_to_n, make_float3(fdata.normal)), 0.0f);
+			float ndl_n = max(dot(-f_to_n, make_float3(ndata.normal)), 0.0f);
+			if (ndl_f > 0.0f &&
+				ndl_n > 0.0f)
 			{
+				float d = length(face_offset);
+				
+				float3 n_diff = make_float3(ndata.diff_alpha);
+				float3 f_diff = make_float3(fdata.diff_alpha);
+				float3 radiance_f = ndl_f * n_diff;// / (d * d + 1.0f); //fixme!
+				float3 radiance_n = ndl_n * f_diff;// / (d * d + 1.0f);
 
+				//save radiances
+				//fixme! 0
+				SurfelLightingBuffer[0].radiance[0][FrontSurfelIdx] += make_float4(radiance_f, 0.0f);
+				SurfelLightingBuffer[0].radiance[0][NextSurfelIdx] += make_float4(radiance_n, 0.0f);
 			}
 		}
 	}
@@ -198,4 +212,22 @@ __host__ void rtSurfelSortAndLighting(const int PlaneSize)
 	GenerateSurfelNumPlane << <gridDim, blockDim >> > ();
 
 	SortingAndLightingSurfel << <gridDim, blockDim >> > ();
+}
+
+__global__ void SurfelRadianceToSrcTest()
+{
+	int surfel_index = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (surfel_index < RasMaxLinkNodeCount)
+	{
+		CalculateIndirectedSurfels[surfel_index].diff_alpha = SurfelLightingBuffer->radiance[0][surfel_index];		
+	}
+}
+
+__host__ void rtSurfelRadianceToSrcTest(const int SurfelNum)
+{
+	const int Stride = 64;
+	dim3 blockDim(Stride, 1);
+	dim3 gridDim(divideAndRoundup(SurfelNum, Stride), 1);
+	SurfelRadianceToSrcTest << <gridDim, blockDim >> > ();
 }

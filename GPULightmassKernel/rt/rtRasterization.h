@@ -225,23 +225,11 @@ __device__ void interplate_triangle_buffer_not_cull_in_buf_list(
 			float3 baryCoords = calculateBarycentricCoordinate(tri_p, make_float2(j + 0.5f, i + 0.5f));
 			bool isInsideTriangle = isBarycentricCoordInBounds(baryCoords);
 			if (isInsideTriangle)
-			{
-				/*float3 local_pos0 = RasVertexLocalPos[index0];
-				float3 local_pos1 = RasVertexLocalPos[index1];
-				float3 local_pos2 = RasVertexLocalPos[index2];
-				float3 out_interplate_pos = interplate_float3(local_pos0, local_pos1, local_pos2, baryCoords);
-
-				float3 local_normal0 = RasVertexNormals[index0];
-				float3 local_normal1 = RasVertexNormals[index1];
-				float3 local_normal2 = RasVertexNormals[index2];
-				float3 out_interplate_normal = interplate_float3(local_normal0, local_normal1, local_normal2, baryCoords);*/
-
+			{				
 				//get output index
 				int index_out_texel = (i - RasBBox[0].z) * w + (j - RasBBox[0].x);
-				//RasXZPlaneBuffer[index_out_texel].pos = make_float4(out_interplate_pos, 1.0f);
-				//RasXZPlaneBuffer[index_out_texel].normal = make_float4(out_interplate_normal);
-
-				//atomicInc(&RasLastIdxNodeBuffer[index_out_texel], -1)
+				index_out_texel = min(index_out_texel, w * h - 1);
+				
 				if (RasCurrLinkCount > RasMaxLinkNodeCount - 1)
 				{
 					return; //over flow
@@ -250,17 +238,7 @@ __device__ void interplate_triangle_buffer_not_cull_in_buf_list(
 				int local_curr_link_count = atomicAdd(&RasCurrLinkCount, 1);
 				RasLinkBuffer[local_curr_link_count].data.uvw = make_float2(baryCoords.x, baryCoords.y);
 				RasLinkBuffer[local_curr_link_count].data.triangle_index = triangle_index;
-				//printf("triangle index = %d\n", triangle_index);
-
-				//if (atomicCAS(&RasLastIdxNodeBuffer[index_out_texel], -1, RasCurrLinkCount) == -1) //empty
-				//{
-
-				//}
-				//else
-				//{
-				//	RasLinkBuffer[RasCurrLinkCount].prev_index = RasLastIdxNodeBuffer[index_out_texel];
-
-				//}
+				
 				int old_index = atomicExch(&RasLastIdxNodeBuffer[index_out_texel], local_curr_link_count);
 				RasLinkBuffer[local_curr_link_count].prev_index = old_index;
 			}

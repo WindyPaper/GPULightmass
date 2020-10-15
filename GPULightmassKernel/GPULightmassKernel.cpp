@@ -115,6 +115,8 @@ __host__ void rtSurfelMapToPlane(const int SurfelNum);
 
 __host__ void rtSurfelSortAndLighting(const int PlaneSize);
 
+__host__ void rtSurfelRadianceToSrcTest(const int SurfelNum);
+
 void WriteHDR(std::string fileName, const float4* buffer, int Width, int Height);
 
 #include "StringUtils.h"
@@ -731,7 +733,7 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(const int GridElementSize, co
 		SurfelIdx++;
 	}
 
-	CalculateSurfelIndirectedLighting(OutSurfelData, OutNumberSurfel[0], GridElementSize);
+	//CalculateSurfelIndirectedLighting(OutSurfelData, OutNumberSurfel[0], GridElementSize);
 
 	delete[] pUpCameraRasData;
 	delete[] pLeftCameraRasData;
@@ -773,7 +775,7 @@ GPULIGHTMASSKERNEL_API void CalculateSurfelIndirectedLighting(SurfelData *InOutS
 
 	//Create Link buffer and radiance buffer
 	SurfelDirLightingData SurfelDirLightingBuffer;
-	SurfelDirLightingBuffer.SurfelNum = SurfelNum;
+	//SurfelDirLightingBuffer.SurfelNum = SurfelNum;
 	cudaCheck(cudaMalloc(&SurfelDirLightingBuffer.radiance[0], sizeof(float4) * SurfelNum));
 	cudaCheck(cudaMemset(SurfelDirLightingBuffer.radiance[0], 0, sizeof(float4) * SurfelNum));
 	cudaCheck(cudaMalloc(&SurfelDirLightingBuffer.radiance[1], sizeof(float4) * SurfelNum));
@@ -867,7 +869,7 @@ GPULIGHTMASSKERNEL_API void CalculateSurfelIndirectedLighting(SurfelData *InOutS
 		}
 	}
 
-
+	rtSurfelRadianceToSrcTest(SurfelNum);
 
 	cudaCheck(cudaMemcpy(InOutSurfelData, cudaSurfelData, SurfelNum * sizeof(SurfelData), cudaMemcpyDeviceToHost));
 
@@ -879,6 +881,7 @@ GPULIGHTMASSKERNEL_API void CalculateSurfelIndirectedLighting(SurfelData *InOutS
 	cudaCheck(cudaFree(cudaViewMat));
 	cudaCheck(cudaFree(cudaBBox));
 	cudaCheck(cudaFree(cudaSortLinkBuffer));
+	cudaCheck(cudaFree(cudaSurfelDirLightingBuffer));
 }
 
 }
