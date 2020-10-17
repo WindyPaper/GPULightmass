@@ -66,11 +66,11 @@ __host__ void rtSurfelDirectLighting(const int SurfelNum)
 
 __global__ void SurfelMapToPlane()
 {
-	int surfel_index = blockIdx.x * blockDim.x + threadIdx.x;
+	int cal_surfel_index = blockIdx.x * blockDim.x + threadIdx.x;
 
-	if (surfel_index < RasMaxLinkNodeCount)
+	if (cal_surfel_index < RasMaxLinkNodeCount)
 	{
-		float3 p = make_float3(CalculateIndirectedSurfels[surfel_index].pos);		
+		float3 p = make_float3(CalculateIndirectedSurfels[cal_surfel_index].pos);
 
 		transform_vertex((*RasViewMat), p); //to camera space
 
@@ -78,7 +78,8 @@ __global__ void SurfelMapToPlane()
 
 		const int w = int(RasBBox[1].x) - int(RasBBox[0].x);
 		const int h = int(RasBBox[1].z) - int(RasBBox[0].z);
-		int surfel_index = max(min(w * int(p.z - RasBBox[0].z) + int(p.x - RasBBox[0].x), w * h - 1), 0); //fixme! should not to be neg num
+		//int surfel_index = max(min(w * int(p.z - RasBBox[0].z) + int(p.x - RasBBox[0].x), w * h - 1), 0); //fixme! should not to be neg num
+		int curr_plane_surfel_index = min(w * int(p.z - RasBBox[0].z) + int(p.x - RasBBox[0].x), w * h - 1); //fixme! should not to be neg num		
 
 		if (RasCurrLinkCount > RasMaxLinkNodeCount - 1)
 		{
@@ -87,11 +88,11 @@ __global__ void SurfelMapToPlane()
 
 		int local_curr_link_count = atomicAdd(&RasCurrLinkCount, 1);		
 		
-		int old_index = atomicExch(&RasLastIdxNodeBuffer[surfel_index], local_curr_link_count);
+		int old_index = atomicExch(&RasLastIdxNodeBuffer[curr_plane_surfel_index], local_curr_link_count);
 		/*printf("SurfelMapToPlane surfel_index = %d, old idx = %d, local_curr_link_count = %d, curr value = %d, w * h - 1 = %d\n", 
 			surfel_index, old_index, local_curr_link_count, RasLastIdxNodeBuffer[surfel_index], w * h - 1);*/
 		RasIntLightingLinkBuffer[local_curr_link_count].PrevIndex = old_index;
-		RasIntLightingLinkBuffer[local_curr_link_count].SurfelIndex = surfel_index;	
+		RasIntLightingLinkBuffer[local_curr_link_count].SurfelIndex = cal_surfel_index;
 	}
 }
 
@@ -193,6 +194,11 @@ __global__ void SortingAndLightingSurfel()
 				float3 f_diff = make_float3(fdata.diff_alpha);
 				float3 radiance_f = ndl_f * n_diff;// / (d * d + 1.0f); //fixme!
 				float3 radiance_n = ndl_n * f_diff;// / (d * d + 1.0f);
+
+				if (radiance_f.x > 0.0f)
+				{
+					printf("radiance_f = %f\n", radiance_f.x);
+				}
 
 				//save radiances
 				//fixme! 0

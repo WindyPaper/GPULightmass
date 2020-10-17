@@ -361,9 +361,13 @@ void Mat4f::cameraMatrix(const Vec3f &lookat, const Vec3f &pos)
 	Vec3f z = cross(lookat, x); // up
 	z.normalize();
 
-	setCol(0, Vec4f(x, -dot(x, pos)));
-	setCol(1, Vec4f(y, -dot(y, pos)));
-	setCol(2, Vec4f(z, -dot(z, pos)));
+	float posx = -dot(x, pos);
+	float posy = -dot(y, pos);
+	float posz = -dot(z, pos);
+	setCol(0, Vec4f(x, 0.0f));
+	setCol(1, Vec4f(y, 0.0f));
+	setCol(2, Vec4f(z, 0.0f));
+	setCol(3, Vec4f(posx, posy, posz, 1.0f));
 	
 }
 

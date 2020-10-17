@@ -3,6 +3,8 @@
 namespace GPULightmass
 {
 
+#define DEBUG_SURFEL_LIGHTING 1
+
 #ifdef GPULIGHTMASSKERNEL_LIB
 #define GPULIGHTMASSKERNEL_API extern "C" __declspec(dllexport)
 #else
@@ -219,5 +221,9 @@ GPULIGHTMASSKERNEL_API void RasterizeModelToSurfel(
 );
 
 GPULIGHTMASSKERNEL_API void CalculateSurfelIndirectedLighting(SurfelData *InOutSurfelData, const int SurfelNum, const int GridElementSize);
+
+#if DEBUG_SURFEL_LIGHTING == 1
+GPULIGHTMASSKERNEL_API void CalculateSurfelIndirectedLightingEXE(SurfelData* InOutSurfelData, const int SurfelNum, const int GridElementSize);
+#endif
 
 }

@@ -125,10 +125,23 @@ void test_cache()
 
 }
 
+void test_surfel()
+{
+	std::ifstream ins;
+	ins.open("./surfel_data.bin", std::ios_base::in | std::ios_base::binary);
+	int surfel_num;
+	ins.read(reinterpret_cast<char*>(&surfel_num), sizeof(int));
+	GPULightmass::SurfelData* surfel_data = new GPULightmass::SurfelData[surfel_num];
+	ins.read((char*)surfel_data, sizeof(GPULightmass::SurfelData) * surfel_num);
+
+	CalculateSurfelIndirectedLightingEXE(surfel_data, surfel_num, 10);
+}
+
 //only for unit test
 int main()
 {	
-	test_cache();
+	//test_cache();
+	test_surfel();
 	//test_simple_triangle();
 
 	return 0;
