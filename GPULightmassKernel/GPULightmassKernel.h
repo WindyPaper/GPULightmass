@@ -226,4 +226,6 @@ GPULIGHTMASSKERNEL_API void CalculateSurfelIndirectedLighting(SurfelData *InOutS
 GPULIGHTMASSKERNEL_API void CalculateSurfelIndirectedLightingEXE(SurfelData* InOutSurfelData, const int SurfelNum, const int GridElementSize);
 #endif
 
+GPULIGHTMASSKERNEL_API void GetDirectionalDebugData(SurfelData* InOutSurfelData, const int SurfelNum, const int GridElementSize, const float4 InDir, int* PlaneCountBuffer, int* SortLinkList, int* XZSize);
+
 }

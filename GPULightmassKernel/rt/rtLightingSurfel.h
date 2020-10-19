@@ -71,15 +71,25 @@ __global__ void SurfelMapToPlane()
 	if (cal_surfel_index < RasMaxLinkNodeCount)
 	{
 		float3 p = make_float3(CalculateIndirectedSurfels[cal_surfel_index].pos);
+		//float3 sp = p;		
 
 		transform_vertex((*RasViewMat), p); //to camera space
 
 		p = p / RasGridElementSize;
 
-		const int w = int(RasBBox[1].x) - int(RasBBox[0].x);
-		const int h = int(RasBBox[1].z) - int(RasBBox[0].z);
+		const int w = (RasBBox[1].x) - (RasBBox[0].x);
+		const int h = (RasBBox[1].z) - (RasBBox[0].z);
 		//int surfel_index = max(min(w * int(p.z - RasBBox[0].z) + int(p.x - RasBBox[0].x), w * h - 1), 0); //fixme! should not to be neg num
-		int curr_plane_surfel_index = min(w * int(p.z - RasBBox[0].z) + int(p.x - RasBBox[0].x), w * h - 1); //fixme! should not to be neg num		
+		float offset_z = p.z - RasBBox[0].z;
+		float offset_x = p.x - RasBBox[0].x;
+		int curr_plane_surfel_index = w * offset_z + offset_x;
+		curr_plane_surfel_index = min(curr_plane_surfel_index, w * h - 1); //fixme! should not to be neg num		
+		/*printf("Set idx = %d, p = (%d, %d, %d), left = %f, bottom = %f, w = %d, h = %d\n", 
+			curr_plane_surfel_index, int(p.x), int(p.y), int(p.z), RasBBox[0].x, RasBBox[0].z, w, h);*/
+		/*printf("p[%d] = (%f, %f, %f), idx = %d, w = %d, h = %d, z = %f, x = %f, minx = %f, minz = %f, maxx = %f, maxz = %f\n", 
+			cal_surfel_index, sp.x, sp.y, sp.z, curr_plane_surfel_index,
+			w, h, offset_z, offset_x,
+			RasBBox[0].x, RasBBox[0].z, RasBBox[1].x, RasBBox[1].z);*/
 
 		if (RasCurrLinkCount > RasMaxLinkNodeCount - 1)
 		{
@@ -89,8 +99,33 @@ __global__ void SurfelMapToPlane()
 		int local_curr_link_count = atomicAdd(&RasCurrLinkCount, 1);		
 		
 		int old_index = atomicExch(&RasLastIdxNodeBuffer[curr_plane_surfel_index], local_curr_link_count);
-		/*printf("SurfelMapToPlane surfel_index = %d, old idx = %d, local_curr_link_count = %d, curr value = %d, w * h - 1 = %d\n", 
-			surfel_index, old_index, local_curr_link_count, RasLastIdxNodeBuffer[surfel_index], w * h - 1);*/
+		/*printf("SurfelMapToPlane surfel_index = %d, old idx = %d, local_curr_link_count = %d\n", 
+			cal_surfel_index, old_index, local_curr_link_count);*/
+
+		//printf("old_index = %d\n", old_index);
+		//if (old_index != -1)
+		//{
+		//	float3 old_pos = make_float3(CalculateIndirectedSurfels[old_index].pos);
+		//	float3 curr_pos = make_float3(CalculateIndirectedSurfels[cal_surfel_index].pos);
+
+		//	transform_vertex((*RasViewMat), old_pos); //to camera space
+		//	old_pos = old_pos / RasGridElementSize;
+		//	old_pos = make_float3(int(old_pos.x), int(old_pos.y), int(old_pos.z));
+
+		//	transform_vertex((*RasViewMat), curr_pos); //to camera space
+		//	curr_pos = curr_pos / RasGridElementSize;
+		//	curr_pos = make_float3(int(curr_pos.x), int(curr_pos.y), int(curr_pos.z));
+
+		//	int CurrIdx = w * (curr_pos.z - int(RasBBox[0].z)) + (curr_pos.x - int(RasBBox[0].x));
+		//	CurrIdx = min(CurrIdx, w * h - 1); //fixme! should not to be neg num		
+
+		//	int OldIdx = w * (old_pos.z - int(RasBBox[0].z)) + (old_pos.x - int(RasBBox[0].x));
+		//	OldIdx = min(OldIdx, w * h - 1); //fixme! should not to be neg num		
+
+		//	printf("old_pos(%f, %f, %f), curr_pos(%f, %f, %f), old idx = %d, curr_idx = %d \n", old_pos.x, old_pos.y, old_pos.z,
+		//		curr_pos.x, curr_pos.y, curr_pos.z, OldIdx, CurrIdx);
+		//}
+
 		RasIntLightingLinkBuffer[local_curr_link_count].PrevIndex = old_index;
 		RasIntLightingLinkBuffer[local_curr_link_count].SurfelIndex = cal_surfel_index;
 	}
@@ -123,6 +158,7 @@ __global__ void GenerateSurfelNumPlane()
 			++SurfelNum;
 		}
 
+		//printf("SurfelNum = %d\n", SurfelNum);
 		RasSurfelSortOffsetNumBuffer[BufferIdx] = SurfelNum;
 	}
 }
@@ -154,6 +190,13 @@ __global__ void SortingAndLightingSurfel()
 			++idx_count;
 		}
 
+		/*if (idx_count != RasSurfelSortOffsetNumBuffer[BufferIdx])
+		{
+			printf("error index count = %d\n", idx_count);
+		}*/
+
+		//printf("index count = %d\n", idx_count);
+
 		//Sorting
 		for (int i = 1; i < idx_count; ++i)
 		{
@@ -162,7 +205,11 @@ __global__ void SortingAndLightingSurfel()
 				int CurrIndex = SurfelSortLinkBuffer[offset + j];
 				int PrevIndex = SurfelSortLinkBuffer[offset + j - 1];
 
-				if (CalculateIndirectedSurfels[CurrIndex].pos.z < CalculateIndirectedSurfels[PrevIndex].pos.z)
+				float3 CurrCamPos = make_float3(CalculateIndirectedSurfels[CurrIndex].pos);
+				float3 PrevCamPos = make_float3(CalculateIndirectedSurfels[PrevIndex].pos);
+				transform_vertex((*RasViewMat), CurrCamPos);
+				transform_vertex((*RasViewMat), PrevCamPos);
+				if (CurrCamPos.y < PrevCamPos.y)
 				{
 					int temp = SurfelSortLinkBuffer[offset + j];
 					SurfelSortLinkBuffer[offset + j] = SurfelSortLinkBuffer[offset + j - 1];
@@ -170,6 +217,17 @@ __global__ void SortingAndLightingSurfel()
 				}
 			}
 		}
+
+		//debug print
+		/*printf("start bufferidx = %d\n", BufferIdx);
+		for (int i = 0; i < idx_count; ++i)
+		{
+			int CurrIndex = SurfelSortLinkBuffer[offset + i];
+			float3 CurrCamPos = make_float3(CalculateIndirectedSurfels[CurrIndex].pos);
+			transform_vertex((*RasViewMat), CurrCamPos);
+			printf("sort index = %d, pos = (%f, %f, %f)\n", i, CurrCamPos.x, CurrCamPos.y, CurrCamPos.z);
+		}
+		printf("end bufferidx = %d\n", BufferIdx);*/
 
 		//Lighting
 		for (int i = 0; i < idx_count - 1; ++i)
@@ -193,12 +251,7 @@ __global__ void SortingAndLightingSurfel()
 				float3 n_diff = make_float3(ndata.diff_alpha);
 				float3 f_diff = make_float3(fdata.diff_alpha);
 				float3 radiance_f = ndl_f * n_diff;// / (d * d + 1.0f); //fixme!
-				float3 radiance_n = ndl_n * f_diff;// / (d * d + 1.0f);
-
-				if (radiance_f.x > 0.0f)
-				{
-					printf("radiance_f = %f\n", radiance_f.x);
-				}
+				float3 radiance_n = ndl_n * f_diff;// / (d * d + 1.0f);				
 
 				//save radiances
 				//fixme! 0
