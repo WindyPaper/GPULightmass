@@ -364,11 +364,9 @@ void Mat4f::cameraMatrix(const Vec3f &lookat, const Vec3f &pos)
 	float posx = -dot(x, pos);
 	float posy = -dot(y, pos);
 	float posz = -dot(z, pos);
-	setCol(0, Vec4f(x, 0.0f));
-	setCol(1, Vec4f(y, 0.0f));
-	setCol(2, Vec4f(z, 0.0f));
-	setCol(3, Vec4f(posx, posy, posz, 1.0f));
-	
+	setCol(0, Vec4f(x, posx));
+	setCol(1, Vec4f(y, posy));
+	setCol(2, Vec4f(z, posz));	
 }
 
 Mat4f Mat4f::operator*(const Mat4f& v) const
@@ -390,7 +388,7 @@ Vec4f Mat4f::operator*(const Vec4f& v) const
 	Vec4f ret;
 	for (int i = 0; i < 4; ++i)
 	{
-		ret[i] = dot(this->getRow(i), v);
+		ret[i] = dot(this->getCol(i), v);
 	}
 
 	return ret;

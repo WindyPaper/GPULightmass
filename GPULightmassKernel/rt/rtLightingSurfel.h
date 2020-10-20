@@ -74,20 +74,20 @@ __global__ void SurfelMapToPlane()
 		//float3 sp = p;		
 
 		transform_vertex((*RasViewMat), p); //to camera space
-
+		//float3 not_scalep = p;
 		p = p / RasGridElementSize;
 
 		const int w = (RasBBox[1].x) - (RasBBox[0].x);
 		const int h = (RasBBox[1].z) - (RasBBox[0].z);
 		//int surfel_index = max(min(w * int(p.z - RasBBox[0].z) + int(p.x - RasBBox[0].x), w * h - 1), 0); //fixme! should not to be neg num
-		float offset_z = p.z - RasBBox[0].z;
-		float offset_x = p.x - RasBBox[0].x;
+		float offset_z = floor(p.z - RasBBox[0].z);
+		float offset_x = floor(p.x - RasBBox[0].x);
 		int curr_plane_surfel_index = w * offset_z + offset_x;
 		curr_plane_surfel_index = min(curr_plane_surfel_index, w * h - 1); //fixme! should not to be neg num		
 		/*printf("Set idx = %d, p = (%d, %d, %d), left = %f, bottom = %f, w = %d, h = %d\n", 
 			curr_plane_surfel_index, int(p.x), int(p.y), int(p.z), RasBBox[0].x, RasBBox[0].z, w, h);*/
 		/*printf("p[%d] = (%f, %f, %f), idx = %d, w = %d, h = %d, z = %f, x = %f, minx = %f, minz = %f, maxx = %f, maxz = %f\n", 
-			cal_surfel_index, sp.x, sp.y, sp.z, curr_plane_surfel_index,
+			cal_surfel_index, p.x, p.y, p.z, curr_plane_surfel_index,
 			w, h, offset_z, offset_x,
 			RasBBox[0].x, RasBBox[0].z, RasBBox[1].x, RasBBox[1].z);*/
 
@@ -158,7 +158,7 @@ __global__ void GenerateSurfelNumPlane()
 			++SurfelNum;
 		}
 
-		//printf("SurfelNum = %d\n", SurfelNum);
+		//printf("BufferIdx = %d, SurfelNum = %d\n", BufferIdx, SurfelNum);
 		RasSurfelSortOffsetNumBuffer[BufferIdx] = SurfelNum;
 	}
 }
@@ -244,7 +244,8 @@ __global__ void SortingAndLightingSurfel()
 			float ndl_f = max(dot(f_to_n, make_float3(fdata.normal)), 0.0f);
 			float ndl_n = max(dot(-f_to_n, make_float3(ndata.normal)), 0.0f);
 			if (ndl_f > 0.0f &&
-				ndl_n > 0.0f)
+				ndl_n > 0.0f &&
+				dot(make_float3(fdata.normal), make_float3(ndata.normal)) < 0.99f)
 			{
 				float d = length(face_offset);
 				
