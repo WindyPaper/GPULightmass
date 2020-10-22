@@ -1,5 +1,6 @@
 #pragma once
 
+#include "rt/rtConstUtil.h"
 
 //__global__ void CalculateSurfelLighting()
 //{
@@ -45,13 +46,84 @@ __global__ void CalSurfelDirectLighting()
 
 			if (OutHitInfo.TriangleIndex == -1)
 			{
-				float3 radiance = DirectionalLights[index].Color * make_float3(max(dot(RayInWorldSpace, Normal), 0.0f));
+				float3 radiance = DirectionalLights[index].Color * make_float3(max(dot(RayInWorldSpace, Normal), 0.0f)) / PI;
 
 				//float3 RayInTangentSpace = WorldToTangent(RayInWorldSpace, tangent1, tangent2, WorldNormal);
 				//OutLightmapData[TargetTexelLocation].PointLightWorldSpace(radiance, RayInTangentSpace, RayInWorldSpace);
 				CalculateIndirectedSurfels[surfel_index].diff_alpha += make_float4(radiance, 0.0f);
 				//CalculateIndirectedSurfels[surfel_index].diff_alpha += make_float4(1.0f);
 			}			
+		}
+
+		//point light
+		for (int index = 0; index < NumPointLights; ++index)
+		{
+			//if (PointLights[index].BakeType == GPULightmass::ALL_BAKED)
+			{
+				float3 LightPosition = PointLights[index].WorldPosition;
+				float Distance = length(WorldPosition - LightPosition);
+				if (Distance < PointLights[index].Radius)
+				{
+					float3 RayOrigin = WorldPosition + Normal * 0.5f;
+					float3 RayInWorldSpace = normalize(LightPosition - WorldPosition);
+
+					HitInfo OutHitInfo;
+
+					rtTrace(
+						OutHitInfo,
+						make_float4(RayOrigin, 0.01),
+						make_float4(RayInWorldSpace, Distance - 0.00001f), true);
+
+					if (OutHitInfo.TriangleIndex == -1)
+					{
+						float3 radiance = PointLights[index].Color / (Distance * Distance + 1.0f);
+						radiance = radiance * make_float3(max(dot(RayInWorldSpace, Normal), 0.0f)) / PI;
+						//float3 RayInTangentSpace = WorldToTangent(RayInWorldSpace, tangent1, tangent2, WorldNormal);
+						//OutLightmapData[TargetTexelLocation].PointLightWorldSpace(radiance, RayInTangentSpace, RayInWorldSpace);
+						CalculateIndirectedSurfels[surfel_index].diff_alpha += make_float4(radiance, 0.0f);
+					}
+				}
+			}
+		}
+
+		// SpotLights
+		for (int index = 0; index < NumSpotLights; ++index)
+		{
+			//if (PointLights[index].BakeType == GPULightmass::ALL_BAKED)
+			{
+				float3 LightPosition = SpotLights[index].WorldPosition;
+				float Distance = length(WorldPosition - LightPosition);
+				if (Distance < SpotLights[index].Radius)
+				{
+					if (dot(normalize(WorldPosition - LightPosition), SpotLights[index].Direction) > SpotLights[index].CosOuterConeAngle)
+					{
+						float3 RayOrigin = WorldPosition + Normal * 0.5f;
+						float3 RayInWorldSpace = normalize(LightPosition - WorldPosition);
+
+						HitInfo OutHitInfo;
+
+						rtTrace(
+							OutHitInfo,
+							make_float4(RayOrigin, 0.01),
+							make_float4(RayInWorldSpace, Distance - 0.00001f), true);
+
+						if (OutHitInfo.TriangleIndex == -1)
+						{
+							float SpotAttenuation = clampf(
+								(dot(normalize(WorldPosition - LightPosition), SpotLights[index].Direction) - SpotLights[index].CosOuterConeAngle) / (SpotLights[index].CosInnerConeAngle - SpotLights[index].CosOuterConeAngle)
+								, 0.0f, 1.0f);
+							SpotAttenuation *= SpotAttenuation;
+
+							//float3 RayInTangentSpace = WorldToTangent(RayInWorldSpace, tangent1, tangent2, WorldNormal);
+							float3 radiance = SpotLights[index].Color / (Distance * Distance + 1.0f) * SpotAttenuation;
+							radiance = radiance * make_float3(max(dot(RayInWorldSpace, Normal), 0.0f)) / PI;
+							//OutLightmapData[TargetTexelLocation].IncidentLighting += SpotLights[index].Color / (Distance * Distance + 1.0f) * SpotAttenuation;
+							CalculateIndirectedSurfels[surfel_index].diff_alpha += make_float4(radiance, 0.0f);
+							//OutLightmapData[TargetTexelLocation].PointLightWorldSpace(radiance, RayInTangentSpace, RayInWorldSpace);
+						}
+					}
+				}
+			}
 		}
 	}
 }
@@ -243,16 +315,16 @@ __global__ void SortingAndLightingSurfel()
 			float3 f_to_n = normalize(face_offset);
 			float ndl_f = max(dot(f_to_n, make_float3(fdata.normal)), 0.0f);
 			float ndl_n = max(dot(-f_to_n, make_float3(ndata.normal)), 0.0f);
+			float diff_brdf = 1.0f / PI;
 			if (ndl_f > 0.0f &&
-				ndl_n > 0.0f &&
-				dot(make_float3(fdata.normal), make_float3(ndata.normal)) < 0.99f)
+				ndl_n > 0.0f)
 			{
-				float d = length(face_offset);
+				//float d = length(face_offset);
 				
 				float3 n_diff = make_float3(ndata.diff_alpha);
 				float3 f_diff = make_float3(fdata.diff_alpha);
-				float3 radiance_f = ndl_f * n_diff;// / (d * d + 1.0f); //fixme!
-				float3 radiance_n = ndl_n * f_diff;// / (d * d + 1.0f);				
+				float3 radiance_f = ndl_f * n_diff * diff_brdf * 2.0f * PI; // / (d * d / 10000.0f + 1.0f); //fixme!
+				float3 radiance_n = ndl_n * f_diff * diff_brdf * 2.0f * PI; // / (d * d / 10000.0f + 1.0f);
 
 				//save radiances
 				//fixme! 0
@@ -280,7 +352,7 @@ __global__ void SurfelRadianceToSrcTest()
 
 	if (surfel_index < RasMaxLinkNodeCount)
 	{
-		CalculateIndirectedSurfels[surfel_index].diff_alpha = SurfelLightingBuffer->radiance[0][surfel_index];		
+		CalculateIndirectedSurfels[surfel_index].diff_alpha = SurfelLightingBuffer->radiance[0][surfel_index]/(16.0f * 16.0f);		
 	}
 }
 

@@ -826,8 +826,8 @@ GPULIGHTMASSKERNEL_API void CalculateSurfelIndirectedLighting(SurfelData *InOutS
 	//First pass, direct lighting
 	rtSurfelDirectLighting(SurfelNum);
 
-	cudaCheck(cudaMemcpy(InOutSurfelData, cudaSurfelData, SurfelNum * sizeof(SurfelData), cudaMemcpyDeviceToHost));
-	CreateSurfelToDisk(InOutSurfelData, SurfelNum);
+	/*cudaCheck(cudaMemcpy(InOutSurfelData, cudaSurfelData, SurfelNum * sizeof(SurfelData), cudaMemcpyDeviceToHost));
+	CreateSurfelToDisk(InOutSurfelData, SurfelNum);*/
 
 	//Create Link buffer and radiance buffer
 	SurfelDirLightingData SurfelDirLightingBuffer;
@@ -858,8 +858,8 @@ GPULIGHTMASSKERNEL_API void CalculateSurfelIndirectedLighting(SurfelData *InOutS
 
 	//semi-spherical sampling
 	const int PassNum = 5;
-	const int NumThetaStep = 4;
-	const int NumPhiStep = 4;
+	const int NumThetaStep = 16;
+	const int NumPhiStep = 16;
 	const float ThetaStep = 3.1415f / 2.0f / (NumThetaStep + 2);
 	const float PhiStep = 3.1415f * 2.0f / NumPhiStep;
 
@@ -1070,6 +1070,11 @@ GPULIGHTMASSKERNEL_API void CalculateSurfelIndirectedLightingEXE(SurfelData* InO
 GPULIGHTMASSKERNEL_API void GetDirectionalDebugData(SurfelData* InOutSurfelData, const int SurfelNum, const int GridElementSize, 
 	const float4 InDir, int* PlaneCountBuffer, int* SortLinkList, int* XZSize)
 {
+	if (SurfelNum == 0)
+	{
+		return;
+	}
+
 	SurfelData* cudaSurfelData;
 	cudaCheck(cudaMalloc(&cudaSurfelData, SurfelNum * sizeof(SurfelData)));
 	cudaCheck(cudaMemcpy(cudaSurfelData, InOutSurfelData, SurfelNum * sizeof(SurfelData), cudaMemcpyHostToDevice));
