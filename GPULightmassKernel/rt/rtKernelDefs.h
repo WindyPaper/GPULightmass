@@ -213,6 +213,12 @@ struct SpotLight
 	int BakeType;
 };
 
+struct GIVolumeCubeData
+{
+	float4 pos;
+	SHVectorRGB SHData;
+};
+
 }
 
 __device__ GPULightmass::DirectionalLight* DirectionalLights;

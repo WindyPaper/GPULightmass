@@ -87,6 +87,12 @@ struct SpotLight
 	BakedType type;
 };
 
+struct GIVolumeCubeData
+{
+	float4 pos;
+	shvectorrgb SHData;
+};
+
 typedef void(*GPULightmassLogHandler)(const wchar_t* message);
 
 GPULIGHTMASSKERNEL_API void SetLogHandler(GPULightmassLogHandler LogHandler);
