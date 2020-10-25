@@ -87,7 +87,7 @@ struct SpotLight
 	BakedType type;
 };
 
-struct GIVolumeCubeData
+struct GIVolumeSHData
 {
 	float4 pos;
 	shvectorrgb SHData;
@@ -233,5 +233,7 @@ GPULIGHTMASSKERNEL_API void CalculateSurfelIndirectedLightingEXE(SurfelData* InO
 #endif
 
 GPULIGHTMASSKERNEL_API void GetDirectionalDebugData(SurfelData* InOutSurfelData, const int SurfelNum, const int GridElementSize, const float4 InDir, int* PlaneCountBuffer, int* SortLinkList, int* XZSize);
+
+GPULIGHTMASSKERNEL_API void BakeGIVolume(SurfelData* InOutSurfelData, const int SurfelNum, const int GridElementSize, GIVolumeSHData *shdatas, const int GIVolumeSHNum);
 
 }

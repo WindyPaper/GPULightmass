@@ -213,7 +213,7 @@ struct SpotLight
 	int BakeType;
 };
 
-struct GIVolumeCubeData
+struct GIVolumeSHData
 {
 	float4 pos;
 	SHVectorRGB SHData;
@@ -236,6 +236,12 @@ int LaunchSizeY;
 __device__ int MappedTexelCounter;
 
 __device__ int* IrradianceWorkspaceBuffer;
+
+__device__ GPULightmass::GIVolumeSHData* BakeGIVolumeSHData;
+__device__ int BakeGIVolumeMaxLinkCount;
+__device__ int BakeGIVolumeCurrLinkCount;
+__device__ int* BakeGIVolumeLastBuffer;
+__device__ int* BakeGIVolumeLinkBuffer;
 
 __align__(16)
 struct TaskBuffer

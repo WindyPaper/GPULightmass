@@ -858,8 +858,8 @@ GPULIGHTMASSKERNEL_API void CalculateSurfelIndirectedLighting(SurfelData *InOutS
 
 	//semi-spherical sampling
 	const int PassNum = 5;
-	const int NumThetaStep = 16;
-	const int NumPhiStep = 16;
+	const int NumThetaStep = 32;
+	const int NumPhiStep = 32;
 	const float ThetaStep = 3.1415f / 2.0f / (NumThetaStep + 2);
 	const float PhiStep = 3.1415f * 2.0f / NumPhiStep;
 
@@ -1198,6 +1198,131 @@ GPULIGHTMASSKERNEL_API void GetDirectionalDebugData(SurfelData* InOutSurfelData,
 	//rtSurfelRadianceToSrcTest(SurfelNum);
 	//cudaCheck(cudaMemcpy(InOutSurfelData, cudaSurfelData, SurfelNum * sizeof(SurfelData), cudaMemcpyDeviceToHost));
 
+
+	delete[] pInitLastIdxBuffer;
+	cudaCheck(cudaFree(cudaSurfelData));
+	cudaCheck(cudaFree(SurfelDirLightingBuffer.radiance[0]));
+	cudaCheck(cudaFree(SurfelDirLightingBuffer.radiance[1]));
+	cudaCheck(cudaFree(cudaLinkBufferData));
+	cudaCheck(cudaFree(cudaViewMat));
+	cudaCheck(cudaFree(cudaBBox));
+	cudaCheck(cudaFree(cudaSortLinkBuffer));
+	cudaCheck(cudaFree(cudaSurfelDirLightingBuffer));
+}
+
+GPULIGHTMASSKERNEL_API void BakeGIVolume(SurfelData* InOutSurfelData, const int SurfelNum, const int GridElementSize, 
+	GIVolumeSHData* shdatas, const int GIVolumeSHNum)
+{
+	SurfelData* cudaSurfelData;
+	cudaCheck(cudaMalloc(&cudaSurfelData, SurfelNum * sizeof(SurfelData)));
+	cudaCheck(cudaMemcpy(cudaSurfelData, InOutSurfelData, SurfelNum * sizeof(SurfelData), cudaMemcpyHostToDevice));
+
+	int* cudaSortLinkBuffer;
+	cudaCheck(cudaMalloc(&cudaSortLinkBuffer, SurfelNum * sizeof(int)));
+	rtBindSurfelIndirectedLightingData(cudaSurfelData, cudaSortLinkBuffer, SurfelNum, GridElementSize);
+
+	float3 BBox[2];
+	GetBBox(InOutSurfelData, SurfelNum, BBox);
+
+	//First pass, direct lighting
+	rtSurfelDirectLighting(SurfelNum);
+	
+	//Create Link buffer and radiance buffer
+	SurfelDirLightingData SurfelDirLightingBuffer;
+	cudaCheck(cudaMalloc(&SurfelDirLightingBuffer.radiance[0], sizeof(float4) * SurfelNum));
+	cudaCheck(cudaMemset(SurfelDirLightingBuffer.radiance[0], 0, sizeof(float4) * SurfelNum));
+	cudaCheck(cudaMalloc(&SurfelDirLightingBuffer.radiance[1], sizeof(float4) * SurfelNum));
+	cudaCheck(cudaMemset(SurfelDirLightingBuffer.radiance[1], 0, sizeof(float4) * SurfelNum));
+	//cudaCheck(cudaMalloc(&SurfelDirLightingBuffer.LinkIndexBuf, sizeof(int) * SurfelNum));
+	SurfelRasIntLinkData* pInitLastIdxBuffer = new SurfelRasIntLinkData[SurfelNum];
+	for (int i = 0; i < SurfelNum; ++i)
+	{
+		pInitLastIdxBuffer[i].PrevIndex = -1;
+		pInitLastIdxBuffer[i].SurfelIndex = -1;
+	}
+	SurfelRasIntLinkData* cudaLinkBufferData;
+	cudaCheck(cudaMalloc(&cudaLinkBufferData, sizeof(SurfelRasIntLinkData) * SurfelNum));
+
+	SurfelDirLightingData* cudaSurfelDirLightingBuffer;
+	cudaCheck(cudaMalloc(&cudaSurfelDirLightingBuffer, sizeof(SurfelDirLightingData)));
+	cudaCheck(cudaMemcpy(cudaSurfelDirLightingBuffer, &SurfelDirLightingBuffer, sizeof(SurfelDirLightingData), cudaMemcpyHostToDevice));
+	rtBindSurfelDirLightData(cudaSurfelDirLightingBuffer);
+
+	Mat4f* cudaViewMat;
+	cudaCheck(cudaMalloc(&cudaViewMat, sizeof(Mat4f)));
+	float3* cudaBBox;
+	cudaCheck(cudaMalloc(&cudaBBox, sizeof(float3) * 2));
+
+	//semi-spherical sampling
+	const int PassNum = 5;
+	const int NumThetaStep = 32;
+	const int NumPhiStep = 32;
+	const float ThetaStep = 3.1415f / 2.0f / (NumThetaStep + 2);
+	const float PhiStep = 3.1415f * 2.0f / NumPhiStep;
+
+	for (int i = 0; i < NumThetaStep; ++i)
+	{
+		for (int j = 0; j < NumPhiStep; ++j)
+		{
+			float theta = ThetaStep * (i + 1);
+			float phi = PhiStep * j;
+
+			float x = std::sin(theta) * std::cos(phi);
+			float y = std::sin(theta) * std::sin(phi);
+			float z = std::cos(theta);
+
+			Mat4f dir;
+			dir.cameraMatrix(Vec3f(-x, -y, -z), Vec3f(0.0f, 0.0f, 0.0f));
+			printf("dir = %f, %f, %f\n", -x, -y, -z);
+
+			//transform bbox to camera			
+			float3 OutMinMaxOBB[2];
+			OBBToCameraSpace(BBox, OutMinMaxOBB, dir);
+
+			float3 BBoxBaseOnCam[2];
+			BBoxBaseOnCam[0] = make_float3(
+				std::floor(OutMinMaxOBB[0].x / GridElementSize),
+				std::floor(OutMinMaxOBB[0].y / GridElementSize),
+				std::floor(OutMinMaxOBB[0].z / GridElementSize));
+			BBoxBaseOnCam[1] = make_float3(
+				std::ceil(OutMinMaxOBB[1].x / GridElementSize),
+				std::ceil(OutMinMaxOBB[1].y / GridElementSize),
+				std::ceil(OutMinMaxOBB[1].z / GridElementSize));
+
+			cudaCheck(cudaMemcpy(cudaViewMat, &dir, sizeof(Mat4f), cudaMemcpyHostToDevice));
+			cudaCheck(cudaMemcpy(cudaBBox, BBoxBaseOnCam, sizeof(float3) * 2, cudaMemcpyHostToDevice));
+
+			int XZNumBufferSize = (BBoxBaseOnCam[1].x - BBoxBaseOnCam[0].x) * (BBoxBaseOnCam[1].z - BBoxBaseOnCam[0].z);
+			int* SurfelLightingLastLink = new int[XZNumBufferSize];
+			for (int nl = 0; nl < XZNumBufferSize; ++nl)
+			{
+				SurfelLightingLastLink[nl] = -1;
+			}
+			int* cudaSurfelLightingLastLink;
+			cudaCheck(cudaMalloc(&cudaSurfelLightingLastLink, sizeof(int) * XZNumBufferSize));
+			cudaCheck(cudaMemcpy(cudaSurfelLightingLastLink, SurfelLightingLastLink, sizeof(int) * XZNumBufferSize, cudaMemcpyHostToDevice));
+
+			cudaCheck(cudaMemcpy(cudaLinkBufferData, pInitLastIdxBuffer, sizeof(SurfelRasIntLinkData) * SurfelNum, cudaMemcpyHostToDevice));
+
+			int* cudaSurfelSortOffsetBuffer;
+			cudaCheck(cudaMalloc(&cudaSurfelSortOffsetBuffer, sizeof(int) * XZNumBufferSize));
+
+			rtBindSurfelIndirectedLightingDirData(cudaViewMat, cudaBBox, cudaSurfelLightingLastLink, cudaLinkBufferData, cudaSurfelSortOffsetBuffer);
+
+			rtSurfelMapToPlane(SurfelNum);
+
+			//sort and lighting			
+			rtSurfelSortAndLighting(XZNumBufferSize);
+
+			cudaCheck(cudaFree(cudaSurfelLightingLastLink));
+			cudaCheck(cudaFree(cudaSurfelSortOffsetBuffer));
+			delete[] SurfelLightingLastLink;
+		}
+	}
+
+	rtSurfelRadianceToSrcTest(SurfelNum);
+
+	cudaCheck(cudaMemcpy(InOutSurfelData, cudaSurfelData, SurfelNum * sizeof(SurfelData), cudaMemcpyDeviceToHost));
 
 	delete[] pInitLastIdxBuffer;
 	cudaCheck(cudaFree(cudaSurfelData));

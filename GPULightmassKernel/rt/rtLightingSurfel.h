@@ -352,7 +352,7 @@ __global__ void SurfelRadianceToSrcTest()
 
 	if (surfel_index < RasMaxLinkNodeCount)
 	{
-		CalculateIndirectedSurfels[surfel_index].diff_alpha = SurfelLightingBuffer->radiance[0][surfel_index]/(16.0f * 16.0f);		
+		CalculateIndirectedSurfels[surfel_index].diff_alpha = SurfelLightingBuffer->radiance[0][surfel_index]/(32.0f * 32.0f);		
 	}
 }
 
