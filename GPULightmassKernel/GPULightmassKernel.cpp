@@ -113,9 +113,23 @@ __host__ void rtBindSurfelIndirectedLightingDirData(
 
 __host__ void rtSurfelMapToPlane(const int SurfelNum);
 
+__host__ void rtGIVolumeMapToPlane(const int GIVolumeNum);
+
 __host__ void rtSurfelSortAndLighting(const int PlaneSize);
 
 __host__ void rtSurfelRadianceToSrcTest(const int SurfelNum);
+
+__host__ void rtBindGIVolumeData(
+	const GPULightmass::GIVolumeSHData *shdatas,
+	const GPULightmass::BakeGIVolumeIntLinkData* GIVolumeLinkBuffer,
+	const int GISHVolumeDataNum
+);
+
+__host__ void rtBindGIVolumeLinkBuffer(
+	const int* GIVolumeLastLinkBuffer
+);
+
+__host__ void rtSurfelSortAndLightingBaking(const int PlaneSize);
 
 void WriteHDR(std::string fileName, const float4* buffer, int Width, int Height);
 
@@ -1248,6 +1262,20 @@ GPULIGHTMASSKERNEL_API void BakeGIVolume(SurfelData* InOutSurfelData, const int 
 	cudaCheck(cudaMemcpy(cudaSurfelDirLightingBuffer, &SurfelDirLightingBuffer, sizeof(SurfelDirLightingData), cudaMemcpyHostToDevice));
 	rtBindSurfelDirLightData(cudaSurfelDirLightingBuffer);
 
+	//Malloc GIVolume memory
+	GIVolumeSHData *cudaGIVolumeSHData;
+	cudaCheck(cudaMalloc(&cudaGIVolumeSHData, sizeof(GIVolumeSHData) * GIVolumeSHNum));
+	cudaCheck(cudaMemcpy(cudaGIVolumeSHData, shdatas, sizeof(GIVolumeSHData) * GIVolumeSHNum, cudaMemcpyHostToDevice));
+	GPULightmass::BakeGIVolumeIntLinkData *pInitBakeGIVolumeIdxBuffer = new GPULightmass::BakeGIVolumeIntLinkData[GIVolumeSHNum];
+	for (int i = 0; i < GIVolumeSHNum; ++i)
+	{
+		pInitBakeGIVolumeIdxBuffer[i].PrevIndex = -1;
+		pInitBakeGIVolumeIdxBuffer[i].GIVolumeDataIndex = -1;
+	}
+	GPULightmass::BakeGIVolumeIntLinkData *cudaGIVolumeLinkBuffer;
+	cudaCheck(cudaMalloc(&cudaGIVolumeLinkBuffer, sizeof(GPULightmass::BakeGIVolumeIntLinkData) * GIVolumeSHNum));
+	rtBindGIVolumeData(cudaGIVolumeSHData, cudaGIVolumeLinkBuffer, GIVolumeSHNum);
+
 	Mat4f* cudaViewMat;
 	cudaCheck(cudaMalloc(&cudaViewMat, sizeof(Mat4f)));
 	float3* cudaBBox;
@@ -1255,8 +1283,8 @@ GPULIGHTMASSKERNEL_API void BakeGIVolume(SurfelData* InOutSurfelData, const int 
 
 	//semi-spherical sampling
 	const int PassNum = 5;
-	const int NumThetaStep = 32;
-	const int NumPhiStep = 32;
+	const int NumThetaStep = 8;
+	const int NumPhiStep = 8;
 	const float ThetaStep = 3.1415f / 2.0f / (NumThetaStep + 2);
 	const float PhiStep = 3.1415f * 2.0f / NumPhiStep;
 
@@ -1308,14 +1336,24 @@ GPULIGHTMASSKERNEL_API void BakeGIVolume(SurfelData* InOutSurfelData, const int 
 			cudaCheck(cudaMalloc(&cudaSurfelSortOffsetBuffer, sizeof(int) * XZNumBufferSize));
 
 			rtBindSurfelIndirectedLightingDirData(cudaViewMat, cudaBBox, cudaSurfelLightingLastLink, cudaLinkBufferData, cudaSurfelSortOffsetBuffer);
+			
+			//Bind GIVolume link buffer data
+			int* cudaBakeGIVolumeLastBuffer;
+			cudaCheck(cudaMalloc(&cudaBakeGIVolumeLastBuffer, sizeof(int) * XZNumBufferSize));
+			cudaCheck(cudaMemcpy(cudaBakeGIVolumeLastBuffer, SurfelLightingLastLink, sizeof(int) * XZNumBufferSize, cudaMemcpyHostToDevice));
+			cudaCheck(cudaMemcpy(cudaGIVolumeLinkBuffer, pInitBakeGIVolumeIdxBuffer, sizeof(BakeGIVolumeIntLinkData) * GIVolumeSHNum, cudaMemcpyHostToDevice));
+			rtBindGIVolumeLinkBuffer(cudaBakeGIVolumeLastBuffer);
 
 			rtSurfelMapToPlane(SurfelNum);
 
-			//sort and lighting			
-			rtSurfelSortAndLighting(XZNumBufferSize);
+			rtGIVolumeMapToPlane(GIVolumeSHNum);
+
+			//Baking GI Volume
+			rtSurfelSortAndLightingBaking(XZNumBufferSize);
 
 			cudaCheck(cudaFree(cudaSurfelLightingLastLink));
 			cudaCheck(cudaFree(cudaSurfelSortOffsetBuffer));
+			cudaCheck(cudaFree(cudaBakeGIVolumeLastBuffer));
 			delete[] SurfelLightingLastLink;
 		}
 	}
@@ -1323,8 +1361,12 @@ GPULIGHTMASSKERNEL_API void BakeGIVolume(SurfelData* InOutSurfelData, const int 
 	rtSurfelRadianceToSrcTest(SurfelNum);
 
 	cudaCheck(cudaMemcpy(InOutSurfelData, cudaSurfelData, SurfelNum * sizeof(SurfelData), cudaMemcpyDeviceToHost));
+	cudaCheck(cudaMemcpy(shdatas, cudaGIVolumeSHData, sizeof(GIVolumeSHData) * GIVolumeSHNum, cudaMemcpyDeviceToHost));
+	
 
 	delete[] pInitLastIdxBuffer;
+	delete[] pInitBakeGIVolumeIdxBuffer;
+
 	cudaCheck(cudaFree(cudaSurfelData));
 	cudaCheck(cudaFree(SurfelDirLightingBuffer.radiance[0]));
 	cudaCheck(cudaFree(SurfelDirLightingBuffer.radiance[1]));
@@ -1333,6 +1375,9 @@ GPULIGHTMASSKERNEL_API void BakeGIVolume(SurfelData* InOutSurfelData, const int 
 	cudaCheck(cudaFree(cudaBBox));
 	cudaCheck(cudaFree(cudaSortLinkBuffer));
 	cudaCheck(cudaFree(cudaSurfelDirLightingBuffer));
+
+	cudaCheck(cudaFree(cudaGIVolumeSHData));
+	cudaCheck(cudaFree(cudaGIVolumeLinkBuffer));
 }
 
 }

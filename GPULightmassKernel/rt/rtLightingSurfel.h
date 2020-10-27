@@ -143,25 +143,18 @@ __global__ void SurfelMapToPlane()
 	if (cal_surfel_index < RasMaxLinkNodeCount)
 	{
 		float3 p = make_float3(CalculateIndirectedSurfels[cal_surfel_index].pos);
-		//float3 sp = p;		
 
 		transform_vertex((*RasViewMat), p); //to camera space
-		//float3 not_scalep = p;
 		p = p / RasGridElementSize;
 
 		const int w = (RasBBox[1].x) - (RasBBox[0].x);
 		const int h = (RasBBox[1].z) - (RasBBox[0].z);
-		//int surfel_index = max(min(w * int(p.z - RasBBox[0].z) + int(p.x - RasBBox[0].x), w * h - 1), 0); //fixme! should not to be neg num
+	
 		float offset_z = floor(p.z - RasBBox[0].z);
 		float offset_x = floor(p.x - RasBBox[0].x);
 		int curr_plane_surfel_index = w * offset_z + offset_x;
-		curr_plane_surfel_index = min(curr_plane_surfel_index, w * h - 1); //fixme! should not to be neg num		
-		/*printf("Set idx = %d, p = (%d, %d, %d), left = %f, bottom = %f, w = %d, h = %d\n", 
-			curr_plane_surfel_index, int(p.x), int(p.y), int(p.z), RasBBox[0].x, RasBBox[0].z, w, h);*/
-		/*printf("p[%d] = (%f, %f, %f), idx = %d, w = %d, h = %d, z = %f, x = %f, minx = %f, minz = %f, maxx = %f, maxz = %f\n", 
-			cal_surfel_index, p.x, p.y, p.z, curr_plane_surfel_index,
-			w, h, offset_z, offset_x,
-			RasBBox[0].x, RasBBox[0].z, RasBBox[1].x, RasBBox[1].z);*/
+		curr_plane_surfel_index = min(curr_plane_surfel_index, w * h - 1);
+		
 
 		if (RasCurrLinkCount > RasMaxLinkNodeCount - 1)
 		{
@@ -170,36 +163,10 @@ __global__ void SurfelMapToPlane()
 
 		int local_curr_link_count = atomicAdd(&RasCurrLinkCount, 1);		
 		
-		int old_index = atomicExch(&RasLastIdxNodeBuffer[curr_plane_surfel_index], local_curr_link_count);
-		/*printf("SurfelMapToPlane surfel_index = %d, old idx = %d, local_curr_link_count = %d\n", 
-			cal_surfel_index, old_index, local_curr_link_count);*/
-
-		//printf("old_index = %d\n", old_index);
-		//if (old_index != -1)
-		//{
-		//	float3 old_pos = make_float3(CalculateIndirectedSurfels[old_index].pos);
-		//	float3 curr_pos = make_float3(CalculateIndirectedSurfels[cal_surfel_index].pos);
-
-		//	transform_vertex((*RasViewMat), old_pos); //to camera space
-		//	old_pos = old_pos / RasGridElementSize;
-		//	old_pos = make_float3(int(old_pos.x), int(old_pos.y), int(old_pos.z));
-
-		//	transform_vertex((*RasViewMat), curr_pos); //to camera space
-		//	curr_pos = curr_pos / RasGridElementSize;
-		//	curr_pos = make_float3(int(curr_pos.x), int(curr_pos.y), int(curr_pos.z));
-
-		//	int CurrIdx = w * (curr_pos.z - int(RasBBox[0].z)) + (curr_pos.x - int(RasBBox[0].x));
-		//	CurrIdx = min(CurrIdx, w * h - 1); //fixme! should not to be neg num		
-
-		//	int OldIdx = w * (old_pos.z - int(RasBBox[0].z)) + (old_pos.x - int(RasBBox[0].x));
-		//	OldIdx = min(OldIdx, w * h - 1); //fixme! should not to be neg num		
-
-		//	printf("old_pos(%f, %f, %f), curr_pos(%f, %f, %f), old idx = %d, curr_idx = %d \n", old_pos.x, old_pos.y, old_pos.z,
-		//		curr_pos.x, curr_pos.y, curr_pos.z, OldIdx, CurrIdx);
-		//}
+		int old_index = atomicExch(&RasLastIdxNodeBuffer[curr_plane_surfel_index], local_curr_link_count);		
 
 		RasIntLightingLinkBuffer[local_curr_link_count].PrevIndex = old_index;
-		RasIntLightingLinkBuffer[local_curr_link_count].SurfelIndex = cal_surfel_index;
+		RasIntLightingLinkBuffer[local_curr_link_count].SurfelIndex = cal_surfel_index;		
 	}
 }
 
@@ -209,6 +176,50 @@ __host__ void rtSurfelMapToPlane(const int SurfelNum)
 	dim3 blockDim(Stride, 1);
 	dim3 gridDim(divideAndRoundup(SurfelNum, Stride), 1);
 	SurfelMapToPlane << <gridDim, blockDim >> > ();
+}
+
+__global__ void GIVolumeDataMapToPlane()
+{
+	int BakeGIVolumeIdx = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (BakeGIVolumeIdx < BakeGIVolumeMaxLinkCount)
+	{
+		float3 p = make_float3(BakeGIVolumeSHData[BakeGIVolumeIdx].pos);
+
+		transform_vertex((*RasViewMat), p); //to camera space
+		p = p / RasGridElementSize;
+
+		const int w = (RasBBox[1].x) - (RasBBox[0].x);
+		const int h = (RasBBox[1].z) - (RasBBox[0].z);
+
+		float offset_z = floor(p.z - RasBBox[0].z);
+		float offset_x = floor(p.x - RasBBox[0].x);
+		int curr_plane_surfel_index = w * offset_z + offset_x;
+		curr_plane_surfel_index = min(curr_plane_surfel_index, w * h - 1);
+
+
+		if (BakeGIVolumeCurrLinkIndex > BakeGIVolumeMaxLinkCount - 1)
+		{
+			return; //over flow
+		}
+
+		int local_curr_link_count = atomicAdd(&BakeGIVolumeCurrLinkIndex, 1);
+
+		//BakeGIVolumeLastBuffer
+		int old_index = atomicExch(&BakeGIVolumeLastBuffer[curr_plane_surfel_index], local_curr_link_count);
+
+		//BakeGIVolumeLinkBuffer
+		BakeGIVolumeLinkBuffer[local_curr_link_count].PrevIndex = old_index;
+		BakeGIVolumeLinkBuffer[local_curr_link_count].GIVolumeDataIndex = BakeGIVolumeIdx;
+	}
+}
+
+__host__ void rtGIVolumeMapToPlane(const int GIVolumeNum)
+{
+	const int Stride = 64;
+	dim3 blockDim(Stride, 1);
+	dim3 gridDim(divideAndRoundup(GIVolumeNum, Stride), 1);
+	GIVolumeDataMapToPlane << <gridDim, blockDim >> > ();
 }
 
 __global__ void GenerateSurfelNumPlane()
@@ -346,13 +357,189 @@ __host__ void rtSurfelSortAndLighting(const int PlaneSize)
 	SortingAndLightingSurfel << <gridDim, blockDim >> > ();
 }
 
+__global__ void SortingAndLightingBaking()
+{
+	int BufferIdx = blockIdx.x * blockDim.x + threadIdx.x;
+	const int w = RasBBox[1].x - RasBBox[0].x;
+	const int h = RasBBox[1].z - RasBBox[0].z;
+	const int PlaneBufferSize = w * h;
+
+	if (BufferIdx < PlaneBufferSize)
+	{
+		int offset = 0;
+		for (int i = 0; i < BufferIdx; ++i)
+		{
+			offset += RasSurfelSortOffsetNumBuffer[i];
+		}
+
+		//Get elements
+		int head = RasLastIdxNodeBuffer[BufferIdx];
+		int next = head;
+		int idx_count = 0;
+		while (next != -1)
+		{
+			SurfelSortLinkBuffer[offset + idx_count] = RasIntLightingLinkBuffer[next].SurfelIndex;
+
+			next = RasIntLightingLinkBuffer[next].PrevIndex;
+			++idx_count;
+		}		
+
+		//Sorting
+		for (int i = 1; i < idx_count; ++i)
+		{
+			for (int j = i; j > 0; --j)
+			{
+				int CurrIndex = SurfelSortLinkBuffer[offset + j];
+				int PrevIndex = SurfelSortLinkBuffer[offset + j - 1];
+
+				float3 CurrCamPos = make_float3(CalculateIndirectedSurfels[CurrIndex].pos);
+				float3 PrevCamPos = make_float3(CalculateIndirectedSurfels[PrevIndex].pos);
+				transform_vertex((*RasViewMat), CurrCamPos);
+				transform_vertex((*RasViewMat), PrevCamPos);
+				if (CurrCamPos.y < PrevCamPos.y)
+				{
+					int temp = SurfelSortLinkBuffer[offset + j];
+					SurfelSortLinkBuffer[offset + j] = SurfelSortLinkBuffer[offset + j - 1];
+					SurfelSortLinkBuffer[offset + j - 1] = temp;
+				}
+			}
+		}		
+
+		//Lighting
+		for (int i = 0; i < idx_count - 1; ++i)
+		{
+			int FrontSurfelIdx = SurfelSortLinkBuffer[offset + i];
+			int NextSurfelIdx = SurfelSortLinkBuffer[offset + i + 1];
+
+			const GPULightmass::SurfelData &fdata = CalculateIndirectedSurfels[FrontSurfelIdx];
+			const GPULightmass::SurfelData &ndata = CalculateIndirectedSurfels[NextSurfelIdx];
+
+			//Is face to face?
+			float3 face_offset = make_float3(ndata.pos) - make_float3(fdata.pos);
+			float3 f_to_n = normalize(face_offset);
+			float ndl_f = max(dot(f_to_n, make_float3(fdata.normal)), 0.0f);
+			float ndl_n = max(dot(-f_to_n, make_float3(ndata.normal)), 0.0f);
+			float diff_brdf = 1.0f / PI;
+			if (ndl_f > 0.0f &&
+				ndl_n > 0.0f)
+			{
+				//float d = length(face_offset);
+
+				float3 n_diff = make_float3(ndata.diff_alpha);
+				float3 f_diff = make_float3(fdata.diff_alpha);
+				float3 radiance_f = ndl_f * n_diff * diff_brdf * 2.0f * PI; // / (d * d / 10000.0f + 1.0f); //fixme!
+				float3 radiance_n = ndl_n * f_diff * diff_brdf * 2.0f * PI; // / (d * d / 10000.0f + 1.0f);
+
+				//save radiances
+				//fixme! 0 100.0f
+				SurfelLightingBuffer[0].radiance[0][FrontSurfelIdx] += make_float4(radiance_f, 0.0f);
+				SurfelLightingBuffer[0].radiance[0][NextSurfelIdx] += make_float4(radiance_n, 0.0f);
+			}
+		}
+
+		//Bake SH Volume
+		int GIVolumeDataHead = BakeGIVolumeLastBuffer[BufferIdx];
+		int GIVolumeDataNext = GIVolumeDataHead;
+		//int idx_count = 0;
+		while (GIVolumeDataNext != -1)
+		{
+			int GIVolumeDataIdx = BakeGIVolumeLinkBuffer[GIVolumeDataNext].GIVolumeDataIndex;
+			GPULightmass::GIVolumeSHData &shdata = BakeGIVolumeSHData[GIVolumeDataIdx];
+
+			float3 GIVolumeDataWPos = make_float3(shdata.pos);
+			float3 GIVolumeDataCamPos = GIVolumeDataWPos;
+			transform_vertex((*RasViewMat), GIVolumeDataCamPos);
+
+			//shdata.SHData.addIncomingRadiance(make_float3(0.5, 0.5, 0.5), 1.0f, normalize(GIVolumeDataWPos));
+
+			//Find nearest surfel
+			for (int i = 0; i < idx_count; ++i)
+			{
+				int CurrIndex = SurfelSortLinkBuffer[offset + i];
+
+				float3 SurfelWPos = make_float3(CalculateIndirectedSurfels[CurrIndex].pos);
+				float3 SurfelWNormal = make_float3(CalculateIndirectedSurfels[CurrIndex].normal);
+				float3 SurfelDiff = make_float3(CalculateIndirectedSurfels[CurrIndex].diff_alpha);
+				float3 SurfelCamPos = SurfelWPos;
+				transform_vertex((*RasViewMat), SurfelCamPos);
+
+				float diff_brdf = 1.0f / PI;
+				if (GIVolumeDataCamPos.y < SurfelCamPos.y)
+				{
+					//isLastOne = false;
+					//Calculate GIVolume lighting
+					float3 VolumeToSurfelDir = normalize(SurfelWPos - GIVolumeDataWPos);
+					float ndl = dot(SurfelWNormal, -VolumeToSurfelDir);
+					if (ndl > 0.0f)
+					{												
+						float3 radiance = SurfelDiff * diff_brdf * 2.0f * PI;
+						shdata.SHData.addIncomingRadiance(radiance * 100.0f, 1.0f, VolumeToSurfelDir);
+					}					
+
+					if (i > 0)
+					{
+						int PrevIndex = SurfelSortLinkBuffer[offset + i - 1];
+						SurfelWPos = make_float3(CalculateIndirectedSurfels[PrevIndex].pos);
+						SurfelWNormal = make_float3(CalculateIndirectedSurfels[PrevIndex].normal);
+						SurfelDiff = make_float3(CalculateIndirectedSurfels[PrevIndex].diff_alpha);
+						SurfelCamPos = SurfelWPos;
+						transform_vertex((*RasViewMat), SurfelCamPos);
+
+						VolumeToSurfelDir = normalize(SurfelWPos - GIVolumeDataWPos);
+						ndl = dot(SurfelWNormal, -VolumeToSurfelDir);
+						if (ndl > 0.0f)
+						{
+							float3 radiance = SurfelDiff * diff_brdf * 2.0f * PI;
+							shdata.SHData.addIncomingRadiance(radiance * 100.0f, 1.0f, VolumeToSurfelDir);
+						}						
+					}
+
+					break;
+				}
+
+				if (i == idx_count - 1) //GI Volume data is last one
+				{
+					int LastIndex = SurfelSortLinkBuffer[offset + i];
+					SurfelWPos = make_float3(CalculateIndirectedSurfels[LastIndex].pos);
+					SurfelWNormal = make_float3(CalculateIndirectedSurfels[LastIndex].normal);
+					SurfelDiff = make_float3(CalculateIndirectedSurfels[LastIndex].diff_alpha);
+					SurfelCamPos = SurfelWPos;
+					transform_vertex((*RasViewMat), SurfelCamPos);
+
+					float3 VolumeToSurfelDir = normalize(SurfelWPos - GIVolumeDataWPos);
+					float ndl = dot(SurfelWNormal, -VolumeToSurfelDir);
+					if (ndl > 0.0f)
+					{
+						float3 radiance = SurfelDiff * diff_brdf * 2.0f * PI;
+						shdata.SHData.addIncomingRadiance(radiance, 1.0f, VolumeToSurfelDir);
+					}
+				}
+			}			
+
+			//next gi volume data
+			GIVolumeDataNext = BakeGIVolumeLinkBuffer[GIVolumeDataNext].PrevIndex;
+		}
+	}
+}
+
+__host__ void rtSurfelSortAndLightingBaking(const int PlaneSize)
+{
+	const int Stride = 64;
+	dim3 blockDim(Stride, 1);
+	dim3 gridDim(divideAndRoundup(PlaneSize, Stride), 1);
+
+	GenerateSurfelNumPlane << <gridDim, blockDim >> > ();
+
+	SortingAndLightingBaking << <gridDim, blockDim >> > ();
+}
+
 __global__ void SurfelRadianceToSrcTest()
 {
 	int surfel_index = blockIdx.x * blockDim.x + threadIdx.x;
 
 	if (surfel_index < RasMaxLinkNodeCount)
 	{
-		CalculateIndirectedSurfels[surfel_index].diff_alpha = SurfelLightingBuffer->radiance[0][surfel_index]/(32.0f * 32.0f);		
+		CalculateIndirectedSurfels[surfel_index].diff_alpha = SurfelLightingBuffer->radiance[0][surfel_index]/(8.0f * 8.0f);		
 	}
 }
 

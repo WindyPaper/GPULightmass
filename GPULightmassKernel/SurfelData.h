@@ -47,4 +47,10 @@ namespace GPULightmass
 		int PrevIndex;
 		int SurfelIndex;
 	};
+
+	struct BakeGIVolumeIntLinkData
+	{
+		int PrevIndex;
+		int GIVolumeDataIndex;
+	};
 }

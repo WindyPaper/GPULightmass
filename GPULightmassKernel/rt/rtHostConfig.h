@@ -566,3 +566,29 @@ __host__ void rtBindSurfelIndirectedLightingDirData(
 
 	cudaCheck(cudaMemcpyToSymbol(RasSurfelSortOffsetNumBuffer, &SortOffsetNumData, sizeof(SortOffsetNumData)));
 }
+
+__host__ void rtBindGIVolumeData(
+	const GPULightmass::GIVolumeSHData *shdatas,
+	const GPULightmass::BakeGIVolumeIntLinkData* GIVolumeLinkBuffer,
+	const int GISHVolumeDataNum
+)
+{
+	cudaCheck(cudaMemcpyToSymbol(BakeGIVolumeSHData, &shdatas, sizeof(shdatas)));
+	cudaCheck(cudaMemcpyToSymbol(BakeGIVolumeMaxLinkCount, &GISHVolumeDataNum, sizeof(GISHVolumeDataNum)));
+
+	/*const int BakeInitCurrIndex = 0;
+	cudaCheck(cudaMemcpyToSymbol(BakeGIVolumeCurrLinkIndex, &BakeInitCurrIndex, sizeof(BakeInitCurrIndex)));*/
+
+	cudaCheck(cudaMemcpyToSymbol(BakeGIVolumeLinkBuffer, &GIVolumeLinkBuffer, sizeof(GIVolumeLinkBuffer)));
+}
+
+__host__ void rtBindGIVolumeLinkBuffer(
+	const int* GIVolumeLastLinkBuffer
+)
+{
+	const int BakeInitCurrIndex = 0;
+	cudaCheck(cudaMemcpyToSymbol(BakeGIVolumeCurrLinkIndex, &BakeInitCurrIndex, sizeof(BakeInitCurrIndex)));
+
+	cudaCheck(cudaMemcpyToSymbol(BakeGIVolumeLastBuffer, &GIVolumeLastLinkBuffer, sizeof(GIVolumeLastLinkBuffer)));
+	//cudaCheck(cudaMemcpyToSymbol(BakeGIVolumeLinkBuffer, &GIVolumeLinkBuffer, sizeof(GIVolumeLinkBuffer)));
+}

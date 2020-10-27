@@ -239,9 +239,9 @@ __device__ int* IrradianceWorkspaceBuffer;
 
 __device__ GPULightmass::GIVolumeSHData* BakeGIVolumeSHData;
 __device__ int BakeGIVolumeMaxLinkCount;
-__device__ int BakeGIVolumeCurrLinkCount;
+__device__ int BakeGIVolumeCurrLinkIndex;
 __device__ int* BakeGIVolumeLastBuffer;
-__device__ int* BakeGIVolumeLinkBuffer;
+__device__ GPULightmass::BakeGIVolumeIntLinkData* BakeGIVolumeLinkBuffer;
 
 __align__(16)
 struct TaskBuffer
