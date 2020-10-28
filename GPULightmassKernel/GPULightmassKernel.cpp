@@ -131,6 +131,8 @@ __host__ void rtBindGIVolumeLinkBuffer(
 
 __host__ void rtSurfelSortAndLightingBaking(const int PlaneSize);
 
+__host__ void rtGIVolumeAverage(const int GIVolumeDataNum);
+
 void WriteHDR(std::string fileName, const float4* buffer, int Width, int Height);
 
 #include "StringUtils.h"
@@ -1358,7 +1360,8 @@ GPULIGHTMASSKERNEL_API void BakeGIVolume(SurfelData* InOutSurfelData, const int 
 		}
 	}
 
-	rtSurfelRadianceToSrcTest(SurfelNum);
+	//rtSurfelRadianceToSrcTest(SurfelNum);
+	//rtGIVolumeAverage(GIVolumeSHNum);
 
 	cudaCheck(cudaMemcpy(InOutSurfelData, cudaSurfelData, SurfelNum * sizeof(SurfelData), cudaMemcpyDeviceToHost));
 	cudaCheck(cudaMemcpy(shdatas, cudaGIVolumeSHData, sizeof(GIVolumeSHData) * GIVolumeSHNum, cudaMemcpyDeviceToHost));

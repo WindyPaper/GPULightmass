@@ -450,8 +450,6 @@ __global__ void SortingAndLightingBaking()
 			float3 GIVolumeDataCamPos = GIVolumeDataWPos;
 			transform_vertex((*RasViewMat), GIVolumeDataCamPos);
 
-			//shdata.SHData.addIncomingRadiance(make_float3(0.5, 0.5, 0.5), 1.0f, normalize(GIVolumeDataWPos));
-
 			//Find nearest surfel
 			for (int i = 0; i < idx_count; ++i)
 			{
@@ -471,9 +469,9 @@ __global__ void SortingAndLightingBaking()
 					float3 VolumeToSurfelDir = normalize(SurfelWPos - GIVolumeDataWPos);
 					float ndl = dot(SurfelWNormal, -VolumeToSurfelDir);
 					if (ndl > 0.0f)
-					{												
-						float3 radiance = SurfelDiff * diff_brdf * 2.0f * PI;
-						shdata.SHData.addIncomingRadiance(radiance * 100.0f, 1.0f, VolumeToSurfelDir);
+					{
+						float3 radiance = SurfelDiff * diff_brdf * (1.0f / 64.0f) * 2.0f * PI;;
+						shdata.SHData.addIncomingRadiance(radiance, 1.0f, VolumeToSurfelDir);
 					}					
 
 					if (i > 0)
@@ -489,8 +487,9 @@ __global__ void SortingAndLightingBaking()
 						ndl = dot(SurfelWNormal, -VolumeToSurfelDir);
 						if (ndl > 0.0f)
 						{
-							float3 radiance = SurfelDiff * diff_brdf * 2.0f * PI;
-							shdata.SHData.addIncomingRadiance(radiance * 100.0f, 1.0f, VolumeToSurfelDir);
+							float N = 1.0f / 64.0f;
+							float3 radiance = SurfelDiff * diff_brdf * (1.0f / 64.0f) * 2.0f * PI;
+							shdata.SHData.addIncomingRadiance(radiance, 1.0f, VolumeToSurfelDir);
 						}						
 					}
 
@@ -510,7 +509,7 @@ __global__ void SortingAndLightingBaking()
 					float ndl = dot(SurfelWNormal, -VolumeToSurfelDir);
 					if (ndl > 0.0f)
 					{
-						float3 radiance = SurfelDiff * diff_brdf * 2.0f * PI;
+						float3 radiance = SurfelDiff * diff_brdf * (1.0f / 64.0f) * 2.0f * PI;
 						shdata.SHData.addIncomingRadiance(radiance, 1.0f, VolumeToSurfelDir);
 					}
 				}
@@ -549,4 +548,23 @@ __host__ void rtSurfelRadianceToSrcTest(const int SurfelNum)
 	dim3 blockDim(Stride, 1);
 	dim3 gridDim(divideAndRoundup(SurfelNum, Stride), 1);
 	SurfelRadianceToSrcTest << <gridDim, blockDim >> > ();
+}
+
+__global__ void GIVolumeAverage()
+{
+	int VolumeDataIdx = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (VolumeDataIdx < BakeGIVolumeMaxLinkCount)
+	{
+		//CalculateIndirectedSurfels[surfel_index].diff_alpha = SurfelLightingBuffer->radiance[0][surfel_index] / (8.0f * 8.0f);
+		BakeGIVolumeSHData[VolumeDataIdx].SHData = BakeGIVolumeSHData[VolumeDataIdx].SHData * (1.0f / 64.0f) * 2.0f * PI;
+	}
+}
+
+__host__ void rtGIVolumeAverage(const int GIVolumeDataNum)
+{
+	const int Stride = 64;
+	dim3 blockDim(Stride, 1);
+	dim3 gridDim(divideAndRoundup(GIVolumeDataNum, Stride), 1);
+	GIVolumeAverage << <gridDim, blockDim >> > ();
 }
